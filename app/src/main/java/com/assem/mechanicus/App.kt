@@ -57,6 +57,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
@@ -132,6 +133,7 @@ class MainActivity : ComponentActivity() {
 fun App(incoming: MutableState<Uri?>? = null) {
     val context = LocalContext.current
     val store = remember { Store(context) }
+    remember { store.ensureOwnerUser() }
     val scope = rememberCoroutineScope()
     var lang by remember { mutableStateOf(store.lang) }
     var dark by remember { mutableStateOf(store.dark) }
@@ -139,6 +141,10 @@ fun App(incoming: MutableState<Uri?>? = null) {
     val backStack = remember { mutableStateListOf<Dest>() }
     var version by remember { mutableStateOf(0) }
     var showExit by remember { mutableStateOf(false) }
+    // Secret owner unlock: tap the little octopus 7 times (within 1.5s between
+    // taps) while signed in as the owner to become the real admin.
+    var octopusTaps by remember { mutableStateOf(0) }
+    var lastOctopusTap by remember { mutableStateOf(0L) }
     // When the owner protects the database, every device must be approved by
     // the admin once. Until then the whole app is locked behind the admin PW.
     var locked by remember { mutableStateOf(store.dbProtected && !store.dbAuthorized) }
@@ -243,6 +249,30 @@ fun App(incoming: MutableState<Uri?>? = null) {
                     val showBar = !locked && (dest == Dest.Home || dest == Dest.Cars || dest == Dest.Payments || dest == Dest.Settings)
                     if (showBar) BottomBar(ctx, dest)
                 }
+                }
+                val mainTab = !locked && (dest == Dest.Home || dest == Dest.Cars || dest == Dest.Payments || dest == Dest.Settings)
+                if (mainTab) {
+                    Box(
+                        Modifier.align(Alignment.BottomCenter).padding(bottom = 74.dp).size(30.dp)
+                            .clip(RoundedCornerShape(50)).clickable {
+                                val now = System.currentTimeMillis()
+                                if (now - lastOctopusTap > 1500L) octopusTaps = 0
+                                lastOctopusTap = now
+                                octopusTaps++
+                                if (octopusTaps >= 7) {
+                                    octopusTaps = 0
+                                    if (ctx.store.isOwner(ctx.store.activeUserName)) {
+                                        ctx.store.adminMode = !ctx.store.adminMode
+                                        ctx.store.addLog(ctx.store.activeUserName, "user", "", if (ctx.store.adminMode) "admin unlock" else "admin lock")
+                                        ctx.bump()
+                                        Toast.makeText(context, if (ctx.store.adminMode) L.s("أهلاً يا مسؤول 🔧", "Welcome, admin 🔧") else L.s("تم قفل صلاحيات المسؤول", "Admin locked"), Toast.LENGTH_SHORT).show()
+                                    } else {
+                                        Toast.makeText(context, "🐙", Toast.LENGTH_SHORT).show()
+                                    }
+                                }
+                            },
+                        contentAlignment = Alignment.Center,
+                    ) { Text("🐙", fontSize = 19.sp, modifier = Modifier.alpha(0.30f)) }
                 }
             }
             if (showExit) {
@@ -434,7 +464,6 @@ fun LoginScreen(ctx: AppCtx) {
     var selected by remember { mutableStateOf("") }
     var pin by remember { mutableStateOf("") }
     var error by remember { mutableStateOf("") }
-    var adminOpen by remember { mutableStateOf(false) }
     var forgot by remember { mutableStateOf(false) }
 
     Column(
@@ -545,65 +574,9 @@ fun LoginScreen(ctx: AppCtx) {
             }
         }
         Spacer(Modifier.height(16.dp))
-        Surface(
-            shape = RoundedCornerShape(50),
-            color = MaterialTheme.colorScheme.surface,
-            border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
-            modifier = Modifier.clickable { adminOpen = true },
-        ) {
-            Row(Modifier.padding(horizontal = 12.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Filled.AdminPanelSettings, contentDescription = "admin", modifier = Modifier.size(14.dp), tint = Muted)
-                Spacer(Modifier.width(6.dp))
-                Text(L.s("دخول المسؤول (عاصم حسين)", "Admin sign-in (Assem Hussein)"), fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Muted)
-            }
-        }
         Text(
             L.s("الاسم للتعريف بمن سجّل فقط، والبيانات محفوظة على الجهاز.", "The name only identifies who logged the change; data stays on this device."),
             color = Muted, fontSize = 12.sp, textAlign = TextAlign.Center, modifier = Modifier.padding(top = 14.dp),
-        )
-    }
-
-    if (adminOpen) {
-        var aName by remember { mutableStateOf("") }
-        var aPin by remember { mutableStateOf("") }
-        var aErr by remember { mutableStateOf("") }
-        AlertDialog(
-            onDismissRequest = { adminOpen = false },
-            title = { Text(L.s("دخول المسؤول", "Admin access")) },
-            text = {
-                Column {
-                    Text(L.s("الاسم والرقم السري للمسؤول.", "Admin name and PIN."), color = Muted, fontSize = 12.sp)
-                    Spacer(Modifier.height(10.dp))
-                    Field(L.s("اسم المسؤول", "Admin name"), aName, { aName = it; aErr = "" })
-                    Spacer(Modifier.height(8.dp))
-                    OutlinedTextField(
-                        value = aPin,
-                        onValueChange = { if (it.length <= 4) aPin = it.filter { c -> c.isDigit() }; aErr = "" },
-                        label = { Text(L.s("الرقم السري (4 أرقام)", "PIN (4 digits)"), fontSize = 12.sp) },
-                        singleLine = true,
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        visualTransformation = PasswordVisualTransformation(),
-                        shape = RoundedCornerShape(13.dp),
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                    if (aErr.isNotEmpty()) Text(aErr, color = Red, fontSize = 12.sp, modifier = Modifier.padding(top = 6.dp))
-                }
-            },
-            confirmButton = {
-                TextButton(onClick = {
-                    if (ctx.store.checkAdmin(aName, aPin)) {
-                        adminOpen = false
-                        ctx.store.adminMode = true
-                        ctx.store.activeUserId = -1L
-                        ctx.store.activeUserName = "عاصم حسين"
-                        ctx.store.addLog("عاصم حسين", "login", "", L.s("دخول المسؤول (صلاحيات مطلقة)", "Admin sign-in (absolute access)"))
-                        ctx.go(Dest.Home)
-                    } else {
-                        aErr = L.s("الاسم أو الرقم غلط", "Wrong name or PIN")
-                    }
-                }) { Text(L.s("دخول", "Sign in"), fontWeight = FontWeight.Bold, color = Red) }
-            },
-            dismissButton = { TextButton(onClick = { adminOpen = false }) { Text(L.s("إلغاء", "Cancel")) } },
         )
     }
 

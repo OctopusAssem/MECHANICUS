@@ -2,6 +2,7 @@ package com.assem.mechanicus
 
 import android.content.Context
 import android.database.sqlite.SQLiteDatabase
+import android.os.Environment
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Calendar
@@ -50,11 +51,53 @@ class Store(private val ctx: Context) {
         get() = prefs.getBoolean("sync_pending", false)
         set(v) = prefs.edit().putBoolean("sync_pending", v).apply()
 
-    fun root(): File {
-        val base = if (useExternal) (ctx.getExternalFilesDir(null) ?: ctx.filesDir) else ctx.filesDir
-        val r = File(base, "MECHANICUS")
+    fun root(): File = rootFor(useExternal)
+
+    fun rootFor(external: Boolean): File {
+        val r = File(baseDir(external), "MECHANICUS")
         if (!r.exists()) r.mkdirs()
         return r
+    }
+
+    private fun externalBase(): File? {
+        val dirs = ctx.getExternalFilesDirs(null)
+        for (d in dirs) {
+            if (d == null) continue
+            val removable = try { Environment.isExternalStorageRemovable(d) } catch (_: Exception) { false }
+            if (removable) return d
+        }
+        return dirs.firstOrNull { it != null }
+    }
+
+    private fun baseDir(external: Boolean): File {
+        if (external) externalBase()?.let { return it }
+        return ctx.filesDir
+    }
+
+    // Move existing data to the requested storage so the switch is real.
+    fun switchStorage(external: Boolean): Boolean {
+        if (external == useExternal) return true
+        if (external && externalBase() == null) return false
+        val from = rootFor(useExternal)
+        val to = rootFor(external)
+        try {
+            if (from.absolutePath != to.absolutePath) copyRecursive(from, to)
+            useExternal = external
+            return true
+        } catch (e: Exception) {
+            return false
+        }
+    }
+
+    private fun copyRecursive(src: File, dst: File) {
+        if (!src.exists()) { dst.mkdirs(); return }
+        if (src.isDirectory) {
+            if (!dst.exists()) dst.mkdirs()
+            src.listFiles()?.forEach { copyRecursive(it, File(dst, it.name)) }
+        } else {
+            dst.parentFile?.mkdirs()
+            src.inputStream().use { i -> dst.outputStream().use { i.copyTo(it) } }
+        }
     }
 
     fun dataDir(): File {

@@ -277,18 +277,38 @@ fun SettingsScreen(ctx: AppCtx) {
         }
     }
 
+    val restoreLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) {
+            try {
+                val n = Backup.restore(context, ctx.store, uri)
+                ctx.store.addLog(ctx.store.activeUserName, "restore", "", "Restored $n db files")
+                sizeText = humanSize(ctx.store.totalSize())
+                ctx.bump()
+                Toast.makeText(context, L.s("تمت استعادة النسخة ($n ملف) ✅", "Backup restored ($n files) ✅"), Toast.LENGTH_LONG).show()
+            } catch (e: Exception) {
+                Toast.makeText(context, L.s("ملف النسخة غير صالح", "Invalid backup file"), Toast.LENGTH_LONG).show()
+            }
+        }
+    }
+
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp)) {
         ScreenBar(title = L.s("الإعدادات", "Settings"))
 
         SectionTitle(L.s("مكان حفظ قاعدة البيانات", "Database storage"))
         CardBox {
-            StorageOption(L.s("الذاكرة الداخلية", "Internal storage"), L.s("أسرع للاستخدام اليومي", "Fastest for daily use"), external = external) {
-                external = false; ctx.store.useExternal = false; ctx.bump()
-                Toast.makeText(context, L.s("تم التبديل للذاكرة الداخلية", "Switched to internal storage"), Toast.LENGTH_SHORT).show()
+            StorageOption(L.s("الذاكرة الداخلية", "Internal storage"), L.s("أسرع للاستخدام اليومي", "Fastest for daily use"), external = !external) {
+                val ok = ctx.store.switchStorage(false)
+                external = ctx.store.useExternal
+                sizeText = humanSize(ctx.store.totalSize())
+                ctx.bump()
+                Toast.makeText(context, if (ok) L.s("تم التبديل للذاكرة الداخلية ✅", "Switched to internal storage ✅") else L.s("فشل التبديل", "Switch failed"), Toast.LENGTH_SHORT).show()
             }
-            StorageOption(L.s("الذاكرة الخارجية (SD)", "External storage (SD)"), L.s("مناسبة للنقل بفلاشة", "Good for moving via USB"), external = !external) {
-                external = true; ctx.store.useExternal = true; ctx.bump()
-                Toast.makeText(context, L.s("تم التبديل للذاكرة الخارجية", "Switched to external storage"), Toast.LENGTH_SHORT).show()
+            StorageOption(L.s("الذاكرة الخارجية (SD)", "External storage (SD)"), L.s("مناسبة للنقل بفلاشة", "Good for moving via USB"), external = external) {
+                val ok = ctx.store.switchStorage(true)
+                external = ctx.store.useExternal
+                sizeText = humanSize(ctx.store.totalSize())
+                ctx.bump()
+                Toast.makeText(context, if (ok) L.s("تم التبديل للذاكرة الخارجية ونقل البيانات ✅", "Switched to external storage and moved data ✅") else L.s("مفيش ذاكرة خارجية متاحة", "No external storage available"), Toast.LENGTH_LONG).show()
             }
             Text(L.s("المسار الحالي: ", "Current path: ") + ctx.store.root().absolutePath, color = Muted, fontSize = 10.5.sp, modifier = Modifier.padding(top = 8.dp))
         }
@@ -390,6 +410,31 @@ fun SettingsScreen(ctx: AppCtx) {
             PrimaryButton(L.s("استيراد ملف جلسة", "Import a session file")) {
                 importLauncher.launch(arrayOf("*/*"))
             }
+        }
+
+        SectionTitle(L.s("نسخة احتياطية لقاعدة البيانات", "Database backup"))
+        CardBox {
+            Text(
+                L.s(
+                    "خد نسخة كاملة من قاعدة البيانات الحالية (كل العربيات والدفعات) واحفظها عندك أو ابعتها. وانشتغلت بيها على موبايل تاني اعمل استعادة من نفس الملف.",
+                    "Take a full copy of the current database (all cars and payments) and keep or send it. To move it to another phone, restore from that same file.",
+                ),
+                color = Muted, fontSize = 11.5.sp, modifier = Modifier.padding(vertical = 6.dp),
+            )
+            PrimaryButton(L.s("أخذ نسخة احتياطية لقاعدة البيانات الحالية", "Take a backup of the current database")) {
+                try {
+                    Backup.export(context, ctx.store, L.s("نسخة احتياطية MECHANICUS", "MECHANICUS backup"))
+                } catch (e: Exception) {
+                    Toast.makeText(context, L.s("فشل إنشاء النسخة", "Backup failed"), Toast.LENGTH_LONG).show()
+                }
+            }
+            Spacer(Modifier.height(8.dp))
+            Surface(
+                shape = RoundedCornerShape(15.dp),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+                color = MaterialTheme.colorScheme.surface,
+                modifier = Modifier.fillMaxWidth().height(52.dp).clickable { restoreLauncher.launch(arrayOf("application/zip", "application/octet-stream", "*/*")) },
+            ) { Box(contentAlignment = Alignment.Center) { Text(L.s("استعادة من نسخة احتياطية", "Restore from a backup"), fontWeight = FontWeight.Bold, fontSize = 15.sp) } }
         }
 
         SectionTitle(L.s("المستخدمون والسجل", "Users & log"))

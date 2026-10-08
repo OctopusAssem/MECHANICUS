@@ -501,6 +501,11 @@ class Store(private val ctx: Context) {
 
     fun isActiveOwner(): Boolean = adminMode
 
+    // A manager sees money and can edit settings. Techs only do operational work
+    // (cars, notes, photos). The owner unlocks manager powers via the octopus.
+    fun activeUserRole(): String = try { users().firstOrNull { it.id == activeUserId }?.role ?: "" } catch (_: Exception) { "" }
+    fun isManager(): Boolean = adminMode || activeUserRole() == "admin"
+
     fun hiddenIds(): MutableSet<String> {
         val db = openCentral()
         val c = db.rawQuery("SELECT id FROM hidden", null)

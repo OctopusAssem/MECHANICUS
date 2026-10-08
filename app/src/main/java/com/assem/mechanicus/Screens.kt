@@ -1,6 +1,7 @@
 package com.assem.mechanicus
 
 import android.graphics.BitmapFactory
+import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
@@ -347,7 +348,11 @@ fun EditCarScreen(ctx: AppCtx, id: String?) {
                 Box(Modifier.weight(1f)) { Field(L.s("الموديل", "Model"), model, { model = it }) }
             }
             Spacer(Modifier.height(12.dp))
-            DateField3(L.s("تاريخ الدخول", "Entry date"), delivery, { delivery = it })
+            if (id == null) {
+                DateField3(L.s("تاريخ الدخول", "Entry date"), delivery, { delivery = it })
+            } else {
+                ReadOnlyField(L.s("تاريخ الدخول (لا يمكن تعديله)", "Entry date (not editable)"), delivery)
+            }
             Spacer(Modifier.height(12.dp))
             Field(L.s("تليفون العميل", "Phone"), phone, { phone = it }, keyboardType = KeyboardType.Phone, digitsOnly = true)
             Spacer(Modifier.height(10.dp))
@@ -374,6 +379,14 @@ fun EditCarScreen(ctx: AppCtx, id: String?) {
 
         Spacer(Modifier.height(6.dp))
         PrimaryButton(L.s("حفظ العربية", "Save car")) {
+            if (plate.isBlank() || phone.isBlank() || delivery.isBlank()) {
+                Toast.makeText(
+                    context,
+                    L.s("لازم رقم اللوحة وتليفون العميل وتاريخ الدخول", "Plate number, customer phone and entry date are required"),
+                    Toast.LENGTH_LONG,
+                ).show()
+                return@PrimaryButton
+            }
             val carId = existing?.id ?: ctx.store.newId()
             val car = Car(
                 id = carId, plate = plate, engine = engine, odometer = odometer, make = make, model = model,

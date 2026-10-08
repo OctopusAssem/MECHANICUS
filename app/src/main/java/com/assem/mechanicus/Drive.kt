@@ -135,33 +135,6 @@ object GDrive {
         dest.parentFile?.mkdirs()
         c.inputStream.use { input -> dest.outputStream().use { input.copyTo(it) } }
     }
-
-    fun sync(ctx: Context, token: String, store: Store): SyncResult {
-        val fid = findOrCreateFolder(token)
-        val remote = listFiles(token, fid)
-        var up = 0
-        var down = 0
-        val locals = store.dbFiles()
-        for (f in locals) {
-            val r = remote[f.name]
-            if (r == null) {
-                uploadFile(token, fid, f, null); up++
-            } else if (f.lastModified() > r.second + 2000) {
-                uploadFile(token, fid, f, r.first); up++
-            }
-        }
-        for ((name, meta) in remote) {
-            val local = locals.find { it.name == name }
-            if (local == null) {
-                val dest = if (name == "app.db") File(store.root(), name) else File(store.dataDir(), name)
-                downloadFile(token, meta.first, dest); down++
-            } else if (meta.second > local.lastModified() + 2000) {
-                downloadFile(token, meta.first, local); down++
-            }
-        }
-        store.lastSync = System.currentTimeMillis()
-        return SyncResult(up, down, "")
-    }
 }
 
 data class SyncResult(val uploaded: Int, val downloaded: Int, val error: String)
@@ -223,8 +196,7 @@ object AutoSync {
         val acc = GDrive.account(context) ?: return OFFLINE
         val tok = GDrive.token(context, acc) ?: return OFFLINE
         return try {
-            GDrive.sync(context, tok, store)
-            store.syncPending = false
+            SyncEngine.run(context, tok, store)
             SYNCED
         } catch (e: Exception) {
             PENDING

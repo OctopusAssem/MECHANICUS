@@ -15,6 +15,7 @@ data class Payment(
     val stage: String,
     val userName: String,
     val ts: Long,
+    val pid: String = "",
 )
 
 data class Car(

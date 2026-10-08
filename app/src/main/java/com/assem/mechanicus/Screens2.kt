@@ -498,7 +498,7 @@ fun SettingsScreen(ctx: AppCtx) {
                     Text(
                         if (dbOn && ctx.store.dbAuthorized) L.s("هذا الجهاز مصرّح له بالوصول.", "This device is authorized.")
                         else if (dbOn) L.s("هذا الجهاز مش مصرّح — مش هيقدر يزامن أو يتعامل مع القاعدة.", "This device is not authorized — it can't sync or touch the database.")
-                        else L.s("أي حد ينزّل البرنامج يقدر يستخدمه لنفسه. لو فعّلت الحماية، أي جهاز لازم تصريح منك بباسورد المسؤول.", "Anyone who installs the app can use it for themselves. If you turn protection on, each device needs your approval with the admin password."),
+                        else L.s("لو فعّلت الحماية، البرنامج نفسه بيتقفل على أي جهاز جديد، ولازم تصريح منك بباسورد المسؤول قبل الاستخدام أو المزامنة.", "If you turn protection on, the whole app locks on any new device — it needs your approval with the admin password before use or sync."),
                         color = Muted, fontSize = 11.5.sp,
                     )
                 }

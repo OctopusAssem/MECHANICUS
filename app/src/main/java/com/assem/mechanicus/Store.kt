@@ -23,7 +23,7 @@ class Store(private val ctx: Context) {
         set(v) = prefs.edit().putBoolean("external", v).apply()
 
     var dark: Boolean
-        get() = prefs.getBoolean("dark", false)
+        get() = prefs.getBoolean("dark", true)
         set(v) = prefs.edit().putBoolean("dark", v).apply()
 
     var driveEmail: String

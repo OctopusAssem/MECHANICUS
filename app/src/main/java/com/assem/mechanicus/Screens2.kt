@@ -404,6 +404,7 @@ fun SettingsScreen(ctx: AppCtx) {
                 shape = RoundedCornerShape(15.dp),
                 border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
                 color = MaterialTheme.colorScheme.surface,
+                shadowElevation = 6.dp,
                 modifier = Modifier.fillMaxWidth().height(52.dp).clickable { Transfer.exportAll(context, ctx.store, L, ctx.store.activeUserName) },
             ) { Box(contentAlignment = Alignment.Center) { Text(L.s("تصدير كل البيانات", "Export all data"), fontWeight = FontWeight.Bold, fontSize = 15.sp) } }
             Spacer(Modifier.height(8.dp))
@@ -433,6 +434,7 @@ fun SettingsScreen(ctx: AppCtx) {
                 shape = RoundedCornerShape(15.dp),
                 border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
                 color = MaterialTheme.colorScheme.surface,
+                shadowElevation = 6.dp,
                 modifier = Modifier.fillMaxWidth().height(52.dp).clickable { restoreLauncher.launch(arrayOf("application/zip", "application/octet-stream", "*/*")) },
             ) { Box(contentAlignment = Alignment.Center) { Text(L.s("استعادة من نسخة احتياطية", "Restore from a backup"), fontWeight = FontWeight.Bold, fontSize = 15.sp) } }
         }
@@ -454,6 +456,7 @@ fun StorageOption(title: String, sub: String, external: Boolean, onClick: () -> 
         shape = RoundedCornerShape(14.dp),
         border = BorderStroke(1.5.dp, if (external) Red else MaterialTheme.colorScheme.outline),
         color = if (external) RedSoft else MaterialTheme.colorScheme.surface,
+        shadowElevation = 5.dp,
         modifier = Modifier.fillMaxWidth().padding(vertical = 5.dp).clickable { onClick() },
     ) {
         Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {

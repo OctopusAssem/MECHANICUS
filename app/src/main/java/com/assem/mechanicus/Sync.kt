@@ -44,7 +44,7 @@ object SyncEngine {
         }
 
         val local = localSnap(store)
-        val (merged, counts) = merge(local, remote)
+        val (merged, counts) = merge(store, local, remote)
         applyMerged(store, merged, local)
 
         val text = merged.toString()
@@ -124,7 +124,7 @@ object SyncEngine {
     }
 
     // ---------------- merge ----------------
-    private fun merge(local: Snap, remote: Snap): Pair<JSONObject, Counts> {
+    private fun merge(store: Store, local: Snap, remote: Snap): Pair<JSONObject, Counts> {
         val counts = Counts()
         val ids = LinkedHashSet<String>()
         ids.addAll(local.cars.keys)
@@ -159,7 +159,7 @@ object SyncEngine {
             val merged = JSONObject(base.toString())
             merged.put("parts", unionParts(base, other))
             merged.put("payments", unionPayments(base, other))
-            merged.put("photo", pickPhoto(l, r) ?: "")
+            merged.put("photo", pickPhoto(store, l, r) ?: "")
             merged.put("updated", maxOf(lu, ru))
             merged.put("created", minOf(l?.optLong("created", 0L) ?: 0L, r?.optLong("created", 0L) ?: 0L)
                 .takeIf { it > 0L } ?: (l?.optLong("created", 0L) ?: r?.optLong("created", 0L) ?: 0L))
@@ -210,12 +210,20 @@ object SyncEngine {
         return out
     }
 
-    private fun pickPhoto(l: JSONObject?, r: JSONObject?): String? {
+    private fun pickPhoto(store: Store, l: JSONObject?, r: JSONObject?): String? {
         val lp = l?.optString("photo").orEmpty()
         val rp = r?.optString("photo").orEmpty()
-        if (lp.isNotBlank() && File(lp).exists()) return lp
-        if (rp.isNotBlank() && File(rp).exists()) return rp
+        if (photoExists(store, lp)) return lp
+        if (photoExists(store, rp)) return rp
         return rp.ifBlank { lp }.ifBlank { null }
+    }
+
+    private fun photoExists(store: Store, p: String): Boolean {
+        if (p.isBlank() || p.startsWith("content://")) return false
+        return try {
+            val f = if (p.contains("/")) File(p) else File(store.photosDir(), p)
+            f.exists() && f.length() > 0
+        } catch (_: Exception) { false }
     }
 
     private fun applyMerged(store: Store, merged: JSONObject, local: Snap) {

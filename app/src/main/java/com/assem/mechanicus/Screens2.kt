@@ -52,6 +52,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import java.text.SimpleDateFormat
@@ -104,7 +105,7 @@ fun PaymentsScreen(ctx: AppCtx) {
                     }
                 }
                 Spacer(Modifier.height(10.dp))
-                Field(L.s("المبلغ (ج.م)", "Amount (EGP)"), amount, { amount = it })
+                Field(L.s("المبلغ (ج.م)", "Amount (EGP)"), amount, { amount = it }, keyboardType = KeyboardType.Number, digitsOnly = true)
                 Spacer(Modifier.height(8.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     FilterChip(selected = stage == "work", onClick = { stage = "work" }, label = { Text(L.s("أثناء العمل", "During work"), fontSize = 12.sp) })
@@ -189,7 +190,7 @@ fun UsersScreen(ctx: AppCtx) {
             CardBox {
                 Field(L.s("الاسم", "Name"), name, { name = it })
                 Spacer(Modifier.height(10.dp))
-                Field(L.s("الرقم السري (4 أرقام)", "PIN (4 digits)"), pin, { if (it.length <= 4) pin = it.filter { c -> c.isDigit() } })
+                Field(L.s("الرقم السري (4 أرقام)", "PIN (4 digits)"), pin, { pin = it }, keyboardType = KeyboardType.Number, digitsOnly = true, maxLen = 4)
                 Spacer(Modifier.height(8.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     FilterChip(selected = role == "tech", onClick = { role = "tech" }, label = { Text(L.s("فني", "Technician"), fontSize = 12.sp) })

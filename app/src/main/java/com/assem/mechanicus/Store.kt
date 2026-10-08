@@ -70,7 +70,8 @@ class Store(private val ctx: Context) {
         val db = SQLiteDatabase.openOrCreateDatabase(File(root(), "app.db"), null)
         db.execSQL("CREATE TABLE IF NOT EXISTS users(id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, pin TEXT, role TEXT, active INTEGER)")
         db.execSQL("CREATE TABLE IF NOT EXISTS logs(id INTEGER PRIMARY KEY AUTOINCREMENT, ts INTEGER, uname TEXT, action TEXT, plate TEXT, detail TEXT)")
-        db.execSQL("CREATE TABLE IF NOT EXISTS car_index(id TEXT PRIMARY KEY, plate TEXT, customer TEXT, phone TEXT, make TEXT, status TEXT, month TEXT, created INTEGER, updated INTEGER, pay REAL, photo TEXT)")
+        db.execSQL("CREATE TABLE IF NOT EXISTS car_index(id TEXT PRIMARY KEY, plate TEXT, customer TEXT, phone TEXT, make TEXT, status TEXT, month TEXT, created INTEGER, updated INTEGER, pay REAL, photo TEXT, adate TEXT)")
+        try { db.execSQL("ALTER TABLE car_index ADD COLUMN adate TEXT") } catch (_: Exception) {}
         val c = db.rawQuery("SELECT COUNT(*) FROM users", null)
         val n = if (c.moveToFirst()) c.getInt(0) else 0
         c.close()
@@ -163,8 +164,8 @@ class Store(private val ctx: Context) {
         val pay = totalPaid(mk, car.id)
         val cdb = openCentral()
         cdb.execSQL(
-            "INSERT OR REPLACE INTO car_index(id,plate,customer,phone,make,status,month,created,updated,pay,photo) VALUES(?,?,?,?,?,?,?,?,?,?,?)",
-            arrayOf<Any?>(car.id, car.plate, car.customer, car.phone, car.make, car.status, mk, created, now, pay, car.photo)
+            "INSERT OR REPLACE INTO car_index(id,plate,customer,phone,make,status,month,created,updated,pay,photo,adate) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)",
+            arrayOf<Any?>(car.id, car.plate, car.customer, car.phone, car.make, car.status, mk, created, now, pay, car.photo, car.deliveryDate)
         )
         cdb.close()
         return car.copy(monthKey = mk, createdAt = created, updatedAt = now)
@@ -172,20 +173,21 @@ class Store(private val ctx: Context) {
 
     fun listCars(filter: String, query: String): List<IndexRow> {
         val db = openCentral()
-        val sb = StringBuilder("SELECT id,plate,customer,phone,status,month,updated,pay,photo FROM car_index WHERE 1=1")
+        val sb = StringBuilder("SELECT id,plate,customer,phone,status,month,updated,pay,photo,adate FROM car_index WHERE 1=1")
         val args = ArrayList<String>()
         if (filter != "all") { sb.append(" AND status=?"); args.add(filter) }
         if (query.isNotBlank()) {
-            sb.append(" AND (plate LIKE ? OR customer LIKE ? OR phone LIKE ? OR make LIKE ? OR id LIKE ?)")
+            sb.append(" AND (plate LIKE ? OR customer LIKE ? OR phone LIKE ? OR make LIKE ? OR id LIKE ? OR adate LIKE ?)")
             val q = "%$query%"
-            repeat(5) { args.add(q) }
+            repeat(6) { args.add(q) }
         }
         sb.append(" ORDER BY updated DESC")
         val c = db.rawQuery(sb.toString(), args.toTypedArray())
         val out = ArrayList<IndexRow>()
         while (c.moveToNext()) out.add(
             IndexRow(c.getString(0) ?: "", c.getString(1) ?: "", c.getString(2) ?: "", c.getString(3) ?: "",
-                c.getString(4) ?: Status.WORK, c.getString(5) ?: "", c.getLong(6), c.getDouble(7), c.getString(8))
+                c.getString(4) ?: Status.WORK, c.getString(5) ?: "", c.getLong(6), c.getDouble(7), c.getString(8),
+                c.getString(9) ?: "")
         )
         c.close(); db.close()
         return out

@@ -302,6 +302,15 @@ fun EditCarScreen(ctx: AppCtx, id: String?) {
     val camera = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { ok ->
         if (ok) photo = pendingFile?.absolutePath else pendingFile?.delete()
     }
+    val gallery = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+        if (uri != null) {
+            try {
+                val f = File(ctx.store.photosDir(), "plate_${System.currentTimeMillis()}.jpg")
+                context.contentResolver.openInputStream(uri)?.use { input -> f.outputStream().use { input.copyTo(it) } }
+                photo = f.absolutePath
+            } catch (_: Exception) {}
+        }
+    }
 
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp)) {
         ScreenBar(title = if (id == null) L.s("إضافة عربية", "New car") else L.s("تعديل عربية", "Edit car"), onBack = { ctx.go(Dest.Home) })
@@ -314,6 +323,16 @@ fun EditCarScreen(ctx: AppCtx, id: String?) {
                 pendingFile = f
                 val uri = FileProvider.getUriForFile(context, context.packageName + ".fileprovider", f)
                 camera.launch(uri)
+            }
+            Spacer(Modifier.height(8.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                GhostButton(L.s("📷 كاميرا", "📷 Camera"), Modifier.weight(1f)) {
+                    val f = File(ctx.store.photosDir(), "plate_${System.currentTimeMillis()}.jpg")
+                    pendingFile = f
+                    val uri = FileProvider.getUriForFile(context, context.packageName + ".fileprovider", f)
+                    camera.launch(uri)
+                }
+                GhostButton(L.s("🖼️ من المعرض", "🖼️ Gallery"), Modifier.weight(1f)) { gallery.launch("image/*") }
             }
         }
 
@@ -371,6 +390,7 @@ fun EditCarScreen(ctx: AppCtx, id: String?) {
             }
             ctx.store.addLog(ctx.store.activeUserName, if (id == null) "add" else "edit", saved.plate, L.s("حفظ بيانات العربية", "Saved car data"))
             ctx.bump()
+            ctx.requestSync()
             ctx.go(Dest.Home)
         }
         Spacer(Modifier.height(26.dp))

@@ -210,3 +210,24 @@ object Report {
         ctx.startActivity(chooser)
     }
 }
+
+// One-shot auto sync used after saving data. Works online; if offline or
+// not yet signed in it leaves the pending flag set so a later attempt syncs.
+object AutoSync {
+    const val SYNCED = "synced"
+    const val OFFLINE = "offline"
+    const val PENDING = "pending"
+
+    fun run(context: Context, store: Store): String {
+        if (!store.driveConnected) return OFFLINE
+        val acc = GDrive.account(context) ?: return OFFLINE
+        val tok = GDrive.token(context, acc) ?: return OFFLINE
+        return try {
+            GDrive.sync(context, tok, store)
+            store.syncPending = false
+            SYNCED
+        } catch (e: Exception) {
+            PENDING
+        }
+    }
+}

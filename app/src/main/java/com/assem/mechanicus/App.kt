@@ -6,6 +6,7 @@ import android.net.Uri
 import android.os.Build
 import android.widget.Toast
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -39,8 +40,10 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -57,6 +60,9 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 sealed interface Dest {
     data object Splash : Dest
@@ -80,6 +86,7 @@ class AppCtx(
     val dark: Boolean,
     val setDark: (Boolean) -> Unit,
     val go: (Dest) -> Unit,
+    val requestSync: () -> Unit,
     val bump: () -> Unit,
     val version: Int,
 )
@@ -115,11 +122,19 @@ class MainActivity : ComponentActivity() {
 fun App(incoming: MutableState<Uri?>? = null) {
     val context = LocalContext.current
     val store = remember { Store(context) }
+    val scope = rememberCoroutineScope()
     var lang by remember { mutableStateOf(store.lang) }
     var dark by remember { mutableStateOf(store.dark) }
     var dest by remember { mutableStateOf<Dest>(Dest.Splash) }
+    val backStack = remember { mutableStateListOf<Dest>() }
     var version by remember { mutableStateOf(0) }
     val L = Lang(lang == "ar")
+
+    fun navigate(d: Dest) {
+        val root = d == Dest.Home || d == Dest.Cars || d == Dest.Payments || d == Dest.Settings
+        if (root) backStack.clear() else backStack.add(dest)
+        dest = d
+    }
 
     LaunchedEffect(incoming?.value) {
         val uri = incoming?.value ?: return@LaunchedEffect
@@ -128,12 +143,21 @@ fun App(incoming: MutableState<Uri?>? = null) {
             val n = Transfer.importUri(context, store, uri, user)
             store.addLog(user, "import", "", "Imported $n")
             version++
+            backStack.clear()
             dest = Dest.Cars
             Toast.makeText(context, L.s("تم استيراد $n عربية ✅", "Imported $n cars ✅"), Toast.LENGTH_LONG).show()
         } catch (e: Exception) {
             Toast.makeText(context, L.s("الملف غير صالح", "Invalid file"), Toast.LENGTH_LONG).show()
         }
         incoming?.value = null
+    }
+
+    // Flush any pending (made-offline) changes to Drive on launch.
+    LaunchedEffect(Unit) {
+        if (store.syncPending && store.driveConnected) {
+            val r = withContext(Dispatchers.IO) { AutoSync.run(context, store) }
+            if (r == AutoSync.SYNCED) version++
+        }
     }
 
     val ctx = AppCtx(
@@ -143,10 +167,22 @@ fun App(incoming: MutableState<Uri?>? = null) {
         setLang = { lang = it; store.lang = it },
         dark = dark,
         setDark = { dark = it; store.dark = it },
-        go = { dest = it },
+        go = { navigate(it) },
+        requestSync = {
+            if (store.driveConnected) scope.launch {
+                when (withContext(Dispatchers.IO) { AutoSync.run(context, store) }) {
+                    AutoSync.SYNCED -> { version++; Toast.makeText(context, L.s("تمت المزامنة ✅", "Synced ✅"), Toast.LENGTH_SHORT).show() }
+                    AutoSync.PENDING -> Toast.makeText(context, L.s("أوفلاين — هيتم تلقائيًا لما النت يرجع", "Offline — will sync automatically when back online"), Toast.LENGTH_SHORT).show()
+                }
+            }
+        },
         bump = { version++ },
         version = version,
     )
+
+    BackHandler(enabled = backStack.isNotEmpty()) {
+        dest = backStack.removeAt(backStack.lastIndex)
+    }
 
     val dir = if (lang == "ar") LayoutDirection.Rtl else LayoutDirection.Ltr
     CompositionLocalProvider(LocalLang provides L, LocalLayoutDirection provides dir) {
@@ -263,45 +299,79 @@ fun LoginScreen(ctx: AppCtx) {
         Text(L.s("مساعد إصلاح السيارات", "YOUR AUTO REPAIR ASSISTANT"), color = Red, fontSize = 11.sp, fontWeight = FontWeight.Bold)
         Spacer(Modifier.height(18.dp))
 
+        var name by remember { mutableStateOf("") }
         CardBox {
-            SectionTitle(L.s("اختر المستخدم", "Select user"))
-            for (u in users) {
-                val on = u.name == selected
-                Surface(
-                    color = if (on) RedSoft else MaterialTheme.colorScheme.surface,
+            if (users.isEmpty()) {
+                SectionTitle(L.s("أول تشغيل — اعمل حسابك", "First run — create your account"))
+                Field(L.s("اكتب اسمك", "Enter your name"), name, { name = it })
+                Spacer(Modifier.height(10.dp))
+                OutlinedTextField(
+                    value = pin,
+                    onValueChange = { if (it.length <= 4) pin = it.filter { c -> c.isDigit() }; error = "" },
+                    label = { Text(L.s("الرقم السري (4 أرقام)", "PIN (4 digits)")) },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    visualTransformation = PasswordVisualTransformation(),
                     shape = RoundedCornerShape(13.dp),
-                    border = androidx.compose.foundation.BorderStroke(1.dp, if (on) Red else MaterialTheme.colorScheme.outline),
-                    modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp).clickable { selected = u.name },
-                ) {
-                    Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Text(u.name, fontWeight = FontWeight.Bold, fontSize = 14.sp, color = if (on) RedDeep else MaterialTheme.colorScheme.onSurface)
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                if (error.isNotEmpty()) {
+                    Text(error, color = Red, fontSize = 12.sp, modifier = Modifier.padding(top = 6.dp))
+                }
+                Spacer(Modifier.height(12.dp))
+                PrimaryButton(L.s("إنشاء ودخول", "Create & sign in")) {
+                    val nm = name.trim()
+                    if (nm.isBlank()) error = L.s("اكتب الاسم", "Enter a name")
+                    else if (pin.length != 4) error = L.s("اكتب رقم سري من 4 أرقام", "Enter a 4-digit PIN")
+                    else {
+                        ctx.store.addUser(nm, pin, "admin")
+                        val u = ctx.store.checkLogin(nm, pin)
+                        ctx.store.activeUserId = u?.id ?: -1L
+                        ctx.store.activeUserName = nm
+                        ctx.store.addLog(nm, "login", "", L.s("أول تشغيل", "First run"))
+                        ctx.go(Dest.Home)
                     }
                 }
-            }
-            Spacer(Modifier.height(6.dp))
-            OutlinedTextField(
-                value = pin,
-                onValueChange = { if (it.length <= 4) pin = it.filter { c -> c.isDigit() }; error = "" },
-                label = { Text(L.s("الرقم السري (4 أرقام)", "PIN (4 digits)")) },
-                singleLine = true,
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                visualTransformation = PasswordVisualTransformation(),
-                shape = RoundedCornerShape(13.dp),
-                modifier = Modifier.fillMaxWidth(),
-            )
-            if (error.isNotEmpty()) {
-                Text(error, color = Red, fontSize = 12.sp, modifier = Modifier.padding(top = 6.dp))
-            }
-            Spacer(Modifier.height(12.dp))
-            PrimaryButton(L.s("دخول", "Sign in")) {
-                val u = ctx.store.checkLogin(selected, pin)
-                if (u == null) {
-                    error = L.s("الرقم السري غلط", "Wrong PIN")
-                } else {
-                    ctx.store.activeUserId = u.id
-                    ctx.store.activeUserName = u.name
-                    ctx.store.addLog(u.name, "login", "", L.s("تسجيل دخول", "Signed in"))
-                    ctx.go(Dest.Home)
+            } else {
+                SectionTitle(L.s("اختر المستخدم", "Select user"))
+                for (u in users) {
+                    val on = u.name == selected
+                    Surface(
+                        color = if (on) RedSoft else MaterialTheme.colorScheme.surface,
+                        shape = RoundedCornerShape(13.dp),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, if (on) Red else MaterialTheme.colorScheme.outline),
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp).clickable { selected = u.name },
+                    ) {
+                        Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Text(u.name, fontWeight = FontWeight.Bold, fontSize = 14.sp, color = if (on) RedDeep else MaterialTheme.colorScheme.onSurface)
+                        }
+                    }
+                }
+                Spacer(Modifier.height(6.dp))
+                OutlinedTextField(
+                    value = pin,
+                    onValueChange = { if (it.length <= 4) pin = it.filter { c -> c.isDigit() }; error = "" },
+                    label = { Text(L.s("الرقم السري (4 أرقام)", "PIN (4 digits)")) },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    visualTransformation = PasswordVisualTransformation(),
+                    shape = RoundedCornerShape(13.dp),
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                if (error.isNotEmpty()) {
+                    Text(error, color = Red, fontSize = 12.sp, modifier = Modifier.padding(top = 6.dp))
+                }
+                Spacer(Modifier.height(12.dp))
+                PrimaryButton(L.s("دخول", "Sign in")) {
+                    val u = ctx.store.checkLogin(selected, pin)
+                    if (u == null) {
+                        error = L.s("الرقم السري غلط", "Wrong PIN")
+                    } else {
+                        ctx.store.activeUserId = u.id
+                        ctx.store.activeUserName = u.name
+                        ctx.store.addLog(u.name, "login", "", L.s("تسجيل دخول", "Signed in"))
+                        ctx.go(Dest.Home)
+                    }
                 }
             }
         }

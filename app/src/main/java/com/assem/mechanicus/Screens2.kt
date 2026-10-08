@@ -498,14 +498,14 @@ fun SyncScreen(ctx: AppCtx) {
                                     try {
                                         val tok = acc?.let { GDrive.token(context, it) }
                                             ?: return@withContext SyncResult(0, 0, L.s("مش قادر أجيب صلاحية الوصول", "Could not get access token"))
-                                        GDrive.sync(context, tok, store)
+                                        SyncEngine.run(context, tok, store)
                                     } catch (e: Exception) {
                                         SyncResult(0, 0, e.message ?: "error")
                                     }
                                 }
                                 busy = false
                                 status = if (res.error.isBlank())
-                                    L.s("تمت المزامنة ✅ — رُفع ${res.uploaded} / نُزّل ${res.downloaded}", "Synced ✅ — uploaded ${res.uploaded} / downloaded ${res.downloaded}")
+                                    L.s("تمت المزامنة ✅ — من جهازك ${res.uploaded} / من السحابة ${res.downloaded}", "Synced ✅ — from this phone ${res.uploaded} / from cloud ${res.downloaded}")
                                 else L.s("خطأ: ", "Error: ") + res.error
                                 ctx.bump()
                             }
@@ -547,7 +547,7 @@ fun SyncScreen(ctx: AppCtx) {
         CardBox {
             Text(store.root().name + "/ (" + L.s("مجلد على الجهاز", "on-device folder") + ")", fontWeight = FontWeight.Black, fontSize = 13.sp)
             for (f in files) Text(f.name + "  (" + humanSize(f.length()) + ")", fontSize = 12.sp)
-            Text(L.s("المزامنة ترفع/تنزّل الملفات المتغيّرة فقط وتدمج حسب وقت التعديل.", "Sync uploads/downloads only changed files and merges by modified time."), color = Muted, fontSize = 11.sp, modifier = Modifier.padding(top = 8.dp))
+            Text(L.s("المزامنة بتدمج العربيات واحدة واحدة حسب آخر تعديل وبتخزّن نسخة مجمّعة (sync.json) على درايف، فمفيش بيانات بتضيع لو أعدت التثبيت أو لو أكتر من موبايل بيستخدموا نفس الحساب.", "Sync merges cars one by one by latest edit and keeps a combined snapshot (sync.json) on Drive, so nothing is lost on reinstall or when several phones share the same account."), color = Muted, fontSize = 11.sp, modifier = Modifier.padding(top = 8.dp))
         }
 
         if (account != null) {

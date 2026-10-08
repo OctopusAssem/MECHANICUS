@@ -77,6 +77,7 @@ class Store(private val ctx: Context) {
         db.execSQL("CREATE TABLE IF NOT EXISTS logs(id INTEGER PRIMARY KEY AUTOINCREMENT, ts INTEGER, uname TEXT, action TEXT, plate TEXT, detail TEXT)")
         db.execSQL("CREATE TABLE IF NOT EXISTS car_index(id TEXT PRIMARY KEY, plate TEXT, customer TEXT, phone TEXT, make TEXT, status TEXT, month TEXT, created INTEGER, updated INTEGER, pay REAL, photo TEXT, adate TEXT)")
         try { db.execSQL("ALTER TABLE car_index ADD COLUMN adate TEXT") } catch (_: Exception) {}
+        db.execSQL("CREATE TABLE IF NOT EXISTS tombstones(id TEXT PRIMARY KEY, updated INTEGER)")
         return db
     }
 
@@ -85,6 +86,7 @@ class Store(private val ctx: Context) {
         db.execSQL("CREATE TABLE IF NOT EXISTS cars(id TEXT PRIMARY KEY, plate TEXT, engine TEXT, odometer TEXT, make TEXT, model TEXT, delivery TEXT, customer TEXT, phone TEXT, worker TEXT, intake TEXT, status TEXT, created INTEGER, updated INTEGER, photo TEXT)")
         db.execSQL("CREATE TABLE IF NOT EXISTS parts(id INTEGER PRIMARY KEY AUTOINCREMENT, carId TEXT, name TEXT)")
         db.execSQL("CREATE TABLE IF NOT EXISTS payments(id INTEGER PRIMARY KEY AUTOINCREMENT, carId TEXT, amount REAL, stage TEXT, uid INTEGER, uname TEXT, ts INTEGER)")
+        try { db.execSQL("ALTER TABLE payments ADD COLUMN pid TEXT") } catch (_: Exception) {}
         return db
     }
 
@@ -170,6 +172,7 @@ class Store(private val ctx: Context) {
             "INSERT OR REPLACE INTO car_index(id,plate,customer,phone,make,status,month,created,updated,pay,photo,adate) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)",
             arrayOf<Any?>(car.id, car.plate, car.customer, car.phone, car.make, car.status, mk, created, now, pay, car.photo, car.deliveryDate)
         )
+        cdb.execSQL("DELETE FROM tombstones WHERE id=?", arrayOf<Any?>(car.id))
         cdb.close()
         syncPending = true
         return car.copy(monthKey = mk, createdAt = created, updatedAt = now)
@@ -237,8 +240,8 @@ class Store(private val ctx: Context) {
         pc.close()
 
         val pays = ArrayList<Payment>()
-        val yc = mdb.rawQuery("SELECT id,carId,amount,stage,uname,ts FROM payments WHERE carId=? ORDER BY ts", arrayOf(id))
-        while (yc.moveToNext()) pays.add(Payment(yc.getLong(0), yc.getString(1) ?: "", yc.getDouble(2), yc.getString(3) ?: "", yc.getString(4) ?: "", yc.getLong(5)))
+        val yc = mdb.rawQuery("SELECT id,carId,amount,stage,uname,ts,pid FROM payments WHERE carId=? ORDER BY ts", arrayOf(id))
+        while (yc.moveToNext()) pays.add(Payment(yc.getLong(0), yc.getString(1) ?: "", yc.getDouble(2), yc.getString(3) ?: "", yc.getString(4) ?: "", yc.getLong(5), yc.getString(6) ?: ""))
         yc.close()
         mdb.close()
 
@@ -247,8 +250,8 @@ class Store(private val ctx: Context) {
 
     fun addPayment(car: Car, amount: Double, stage: String, userName: String) {
         val db = openMonth(car.monthKey)
-        db.execSQL("INSERT INTO payments(carId,amount,stage,uid,uname,ts) VALUES(?,?,?,?,?,?)",
-            arrayOf<Any?>(car.id, amount, stage, activeUserId, userName, System.currentTimeMillis()))
+        db.execSQL("INSERT INTO payments(carId,amount,stage,uid,uname,ts,pid) VALUES(?,?,?,?,?,?,?)",
+            arrayOf<Any?>(car.id, amount, stage, activeUserId, userName, System.currentTimeMillis(), newId()))
         db.close()
         val pay = totalPaid(car.monthKey, car.id)
         val cdb = openCentral()
@@ -275,6 +278,7 @@ class Store(private val ctx: Context) {
         db.close()
         val cdb = openCentral()
         cdb.execSQL("DELETE FROM car_index WHERE id=?", arrayOf(car.id))
+        cdb.execSQL("INSERT OR REPLACE INTO tombstones(id,updated) VALUES(?,?)", arrayOf<Any?>(car.id, System.currentTimeMillis()))
         cdb.close()
         syncPending = true
     }
@@ -331,6 +335,72 @@ class Store(private val ctx: Context) {
         File(root(), "app.db").takeIf { it.exists() }?.let { list.add(it) }
         dataDir().listFiles()?.filter { it.name.endsWith(".db") }?.let { list.addAll(it) }
         return list
+    }
+
+    // ---------- sync helpers ----------
+    fun allCarsFull(): List<Car> = carIndexIds().mapNotNull { carDetail(it) }
+
+    private fun carIndexIds(): List<String> {
+        val db = openCentral()
+        val c = db.rawQuery("SELECT id FROM car_index", null)
+        val out = ArrayList<String>()
+        while (c.moveToNext()) c.getString(0)?.let { out.add(it) }
+        c.close(); db.close()
+        return out
+    }
+
+    fun tombstones(): Map<String, Long> {
+        val db = openCentral()
+        val c = db.rawQuery("SELECT id,updated FROM tombstones", null)
+        val out = HashMap<String, Long>()
+        while (c.moveToNext()) out[c.getString(0) ?: ""] = c.getLong(1)
+        c.close(); db.close()
+        return out
+    }
+
+    fun replaceTombstones(map: Map<String, Long>) {
+        val db = openCentral()
+        db.execSQL("DELETE FROM tombstones")
+        for ((k, v) in map) if (k.isNotBlank()) db.execSQL("INSERT OR REPLACE INTO tombstones(id,updated) VALUES(?,?)", arrayOf<Any?>(k, v))
+        db.close()
+    }
+
+    fun upsertCarFull(car: Car) {
+        val mk = car.monthKey.ifBlank { monthKey(if (car.createdAt > 0) car.createdAt else System.currentTimeMillis()) }
+        val created = if (car.createdAt > 0) car.createdAt else System.currentTimeMillis()
+        val updated = if (car.updatedAt > 0) car.updatedAt else System.currentTimeMillis()
+        val mdb = openMonth(mk)
+        mdb.execSQL(
+            "INSERT OR REPLACE INTO cars(id,plate,engine,odometer,make,model,delivery,customer,phone,worker,intake,status,created,updated,photo) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            arrayOf<Any?>(car.id, car.plate, car.engine, car.odometer, car.make, car.model, car.deliveryDate, car.customer, car.phone, car.worker, car.intake, car.status, created, updated, car.photo)
+        )
+        mdb.execSQL("DELETE FROM parts WHERE carId=?", arrayOf(car.id))
+        for (p in car.parts) if (p.isNotBlank()) mdb.execSQL("INSERT INTO parts(carId,name) VALUES(?,?)", arrayOf(car.id, p.trim()))
+        mdb.execSQL("DELETE FROM payments WHERE carId=?", arrayOf(car.id))
+        for (p in car.payments) mdb.execSQL(
+            "INSERT INTO payments(carId,amount,stage,uid,uname,ts,pid) VALUES(?,?,?,?,?,?,?)",
+            arrayOf<Any?>(car.id, p.amount, p.stage, activeUserId, p.userName, p.ts, p.pid.ifBlank { newId() })
+        )
+        mdb.close()
+        val pay = totalPaid(mk, car.id)
+        val cdb = openCentral()
+        cdb.execSQL(
+            "INSERT OR REPLACE INTO car_index(id,plate,customer,phone,make,status,month,created,updated,pay,photo,adate) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)",
+            arrayOf<Any?>(car.id, car.plate, car.customer, car.phone, car.make, car.status, mk, created, updated, pay, car.photo, car.deliveryDate)
+        )
+        cdb.execSQL("DELETE FROM tombstones WHERE id=?", arrayOf<Any?>(car.id))
+        cdb.close()
+    }
+
+    fun removeCarLocal(id: String, month: String) {
+        val db = openMonth(month)
+        db.execSQL("DELETE FROM cars WHERE id=?", arrayOf(id))
+        db.execSQL("DELETE FROM parts WHERE carId=?", arrayOf(id))
+        db.execSQL("DELETE FROM payments WHERE carId=?", arrayOf(id))
+        db.close()
+        val cdb = openCentral()
+        cdb.execSQL("DELETE FROM car_index WHERE id=?", arrayOf(id))
+        cdb.close()
     }
 
     fun totalSize(): Long = dbFiles().sumOf { it.length() } + photosDir().walkTopDown().filter { it.isFile }.sumOf { it.length() }

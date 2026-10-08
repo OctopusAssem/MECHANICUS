@@ -221,7 +221,7 @@ fun CarsScreen(ctx: AppCtx) {
             value = query,
             onValueChange = { query = it },
             leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
-            placeholder = { Text(L.s("ابحث باللوحة أو العميل أو التليفون", "Search plate, customer, phone")) },
+            placeholder = { Text(L.s("ابحث برقم اللوحة أو التليفون أو تاريخ الدخول", "Search plate, phone or entry date")) },
             singleLine = true,
             shape = RoundedCornerShape(13.dp),
             modifier = Modifier.fillMaxWidth(),
@@ -262,7 +262,10 @@ fun CarListItem(row: IndexRow, onClick: () -> Unit) {
                     StatusChip(row.status)
                 }
                 Text(row.customer, fontWeight = FontWeight.Bold, fontSize = 14.sp, modifier = Modifier.padding(top = 5.dp))
-                Text(row.phone, color = Muted, fontSize = 11.5.sp)
+                Text(
+                    listOf(row.phone, row.adate).filter { it.isNotBlank() }.joinToString("   •   "),
+                    color = Muted, fontSize = 11.5.sp,
+                )
             }
             Column(horizontalAlignment = Alignment.End) {
                 Text(money(row.pay), color = Green, fontWeight = FontWeight.Black, fontSize = 15.sp)
@@ -315,19 +318,18 @@ fun EditCarScreen(ctx: AppCtx, id: String?) {
 
         CardBox {
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                Box(Modifier.weight(1f)) { Field(L.s("رقم الموتور", "Engine no."), engine, { engine = it }) }
-                Box(Modifier.weight(1f)) { Field(L.s("العداد (كم)", "Odometer"), odometer, { odometer = it }) }
+                Box(Modifier.weight(1f)) { Field(L.s("رقم الموتور", "Engine no."), engine, { engine = it }, keyboardType = KeyboardType.Number, digitsOnly = true) }
+                Box(Modifier.weight(1f)) { Field(L.s("العداد (كم)", "Odometer"), odometer, { odometer = it }, keyboardType = KeyboardType.Number, digitsOnly = true) }
             }
             Spacer(Modifier.height(10.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 Box(Modifier.weight(1f)) { Field(L.s("النوع", "Make"), make, { make = it }) }
                 Box(Modifier.weight(1f)) { Field(L.s("الموديل", "Model"), model, { model = it }) }
             }
-            Spacer(Modifier.height(10.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                Box(Modifier.weight(1f)) { Field(L.s("تاريخ التسليم", "Delivery date"), delivery, { delivery = it }) }
-                Box(Modifier.weight(1f)) { Field(L.s("تليفون العميل", "Phone"), phone, { phone = it }) }
-            }
+            Spacer(Modifier.height(12.dp))
+            DateField3(L.s("تاريخ الدخول", "Entry date"), delivery, { delivery = it })
+            Spacer(Modifier.height(12.dp))
+            Field(L.s("تليفون العميل", "Phone"), phone, { phone = it }, keyboardType = KeyboardType.Phone, digitsOnly = true)
             Spacer(Modifier.height(10.dp))
             Field(L.s("اسم العميل", "Customer name"), customer, { customer = it })
             Spacer(Modifier.height(10.dp))
@@ -341,7 +343,7 @@ fun EditCarScreen(ctx: AppCtx, id: String?) {
         if (id == null) {
             CardBox {
                 SectionTitle(L.s("دفعة مبدئية (اختياري)", "Initial payment (optional)"))
-                Field(L.s("المبلغ", "Amount"), payNow, { payNow = it })
+                Field(L.s("المبلغ", "Amount"), payNow, { payNow = it }, keyboardType = KeyboardType.Number, digitsOnly = true)
                 Spacer(Modifier.height(8.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     FilterChip(selected = payStage == "on", onClick = { payStage = "on" }, label = { Text(L.s("عند التسليم", "On delivery"), fontSize = 12.sp) })
@@ -409,7 +411,7 @@ fun DetailScreen(ctx: AppCtx, id: String) {
             InfoRow(L.s("التليفون", "Phone"), car.phone)
             InfoRow(L.s("رقم الموتور", "Engine"), car.engine)
             InfoRow(L.s("العداد", "Odometer"), car.odometer)
-            InfoRow(L.s("تاريخ التسليم", "Delivery"), car.deliveryDate)
+            InfoRow(L.s("تاريخ الدخول", "Entry date"), car.deliveryDate)
             InfoRow(L.s("العامل المسؤول", "Worker"), car.worker)
             InfoRow(L.s("ملاحظات الدخول", "Intake notes"), car.intake.ifBlank { "—" })
         }

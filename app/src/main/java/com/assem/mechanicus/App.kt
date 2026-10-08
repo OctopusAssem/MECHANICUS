@@ -6,6 +6,7 @@ import androidx.activity.compose.setContent
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -242,6 +243,7 @@ fun LoginScreen(ctx: AppCtx) {
                 onValueChange = { if (it.length <= 4) pin = it.filter { c -> c.isDigit() }; error = "" },
                 label = { Text(L.s("الرقم السري (4 أرقام)", "PIN (4 digits)")) },
                 singleLine = true,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                 visualTransformation = PasswordVisualTransformation(),
                 shape = RoundedCornerShape(13.dp),
                 modifier = Modifier.fillMaxWidth(),

@@ -48,6 +48,7 @@ data class IndexRow(
     val updated: Long,
     val pay: Double,
     val photo: String?,
+    val adate: String = "",
 )
 
 data class PayRow(

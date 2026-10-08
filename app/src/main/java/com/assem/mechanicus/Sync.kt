@@ -18,7 +18,8 @@ object SyncEngine {
     data class Counts(var pushed: Int = 0, var pulled: Int = 0, var deleted: Int = 0)
 
     fun run(ctx: Context, token: String, store: Store): SyncResult {
-        val folder = GDrive.findOrCreateFolder(token, store.driveFolderId)
+        val preferred = store.driveFolderId.ifBlank { if (ServiceAuth.isConfigured()) ServiceAuth.FOLDER_ID else "" }
+        val folder = GDrive.findOrCreateFolder(token, preferred)
         // Learn the folder id on first sync so the owner can copy it to other
         // phones (so phones with different Google accounts sync to the same place).
         if (store.driveFolderId.isBlank()) store.driveFolderId = folder

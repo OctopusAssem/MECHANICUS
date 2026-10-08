@@ -114,7 +114,7 @@ class Store(private val ctx: Context) {
 
     fun setPin(id: Long, pin: String) {
         val db = openCentral()
-        db.execSQL("UPDATE users SET pin=? WHERE id=?", arrayOf(pin, id))
+        db.execSQL("UPDATE users SET pin=? WHERE id=?", arrayOf<Any?>(pin, id))
         db.close()
     }
 

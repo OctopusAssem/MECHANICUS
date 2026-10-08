@@ -1,6 +1,10 @@
 package com.assem.mechanicus
 
 import android.os.Bundle
+import android.content.Intent
+import android.net.Uri
+import android.os.Build
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.Image
@@ -32,6 +36,8 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -79,14 +85,34 @@ class AppCtx(
 )
 
 class MainActivity : ComponentActivity() {
+    private val incoming = mutableStateOf<Uri?>(null)
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContent { App() }
+        setContent { App(incoming) }
+        handleIntent(intent)
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        handleIntent(intent)
+    }
+
+    private fun handleIntent(i: Intent?) {
+        if (i == null) return
+        if (i.action != Intent.ACTION_VIEW && i.action != Intent.ACTION_SEND) return
+        val uri: Uri? = i.data ?: if (Build.VERSION.SDK_INT >= 33) {
+            i.getParcelableExtra(Intent.EXTRA_STREAM, Uri::class.java)
+        } else {
+            @Suppress("DEPRECATION") (i.getParcelableExtra(Intent.EXTRA_STREAM) as? Uri)
+        }
+        if (uri != null) incoming.value = uri
     }
 }
 
 @Composable
-fun App() {
+fun App(incoming: MutableState<Uri?>? = null) {
     val context = LocalContext.current
     val store = remember { Store(context) }
     var lang by remember { mutableStateOf(store.lang) }
@@ -94,6 +120,21 @@ fun App() {
     var dest by remember { mutableStateOf<Dest>(Dest.Splash) }
     var version by remember { mutableStateOf(0) }
     val L = Lang(lang == "ar")
+
+    LaunchedEffect(incoming?.value) {
+        val uri = incoming?.value ?: return@LaunchedEffect
+        try {
+            val user = store.activeUserName.ifBlank { "import" }
+            val n = Transfer.importUri(context, store, uri, user)
+            store.addLog(user, "import", "", "Imported $n")
+            version++
+            dest = Dest.Cars
+            Toast.makeText(context, L.s("تم استيراد $n عربية ✅", "Imported $n cars ✅"), Toast.LENGTH_LONG).show()
+        } catch (e: Exception) {
+            Toast.makeText(context, L.s("الملف غير صالح", "Invalid file"), Toast.LENGTH_LONG).show()
+        }
+        incoming?.value = null
+    }
 
     val ctx = AppCtx(
         store = store,

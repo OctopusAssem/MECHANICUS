@@ -29,6 +29,7 @@ import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -144,8 +145,8 @@ fun HomeScreen(ctx: AppCtx) {
             Row(horizontalArrangement = Arrangement.spacedBy(11.dp)) {
                 QuickAction("🚗", L.s("إضافة عربية", "Add car"), Modifier.weight(1f)) { ctx.go(Dest.Edit(null)) }
                 QuickAction("💰", L.s("تسجيل دفعة", "Record payment"), Modifier.weight(1f)) { ctx.go(Dest.Payments) }
-                QuickAction("📤", L.s("إرسال جلسة اليوم", "Send today"), Modifier.weight(1f)) {
-                    Report.share(context, Report.today(ctx.store, L.isAr), L.s("تقرير جلسة اليوم", "Today session report"))
+                QuickAction("📤", L.s("تصدير جلسة اليوم", "Export today"), Modifier.weight(1f)) {
+                    Transfer.exportToday(context, ctx.store, L, ctx.store.activeUserName)
                 }
             }
         }
@@ -380,6 +381,7 @@ fun EditCarScreen(ctx: AppCtx, id: String?) {
 @Composable
 fun DetailScreen(ctx: AppCtx, id: String) {
     val L = ctx.L
+    val context = LocalContext.current
     val car = remember(ctx.version, id) { ctx.store.carDetail(id) }
     if (car == null) {
         Column(Modifier.fillMaxSize().padding(16.dp)) { ScreenBar(L.s("ملف العربية", "Vehicle"), { ctx.go(Dest.Cars) }); EmptyNote(L.s("غير موجودة", "Not found")) }
@@ -389,6 +391,7 @@ fun DetailScreen(ctx: AppCtx, id: String) {
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp)) {
         ScreenBar(title = L.s("ملف العربية", "Vehicle file"), onBack = { ctx.go(Dest.Cars) }, action = {
             Row {
+                IconButton(onClick = { Transfer.exportOne(context, car, L, ctx.store.activeUserName) }) { Icon(Icons.Filled.Share, contentDescription = "export") }
                 IconButton(onClick = { ctx.go(Dest.Edit(id)) }) { Icon(Icons.Filled.Edit, contentDescription = "edit") }
                 IconButton(onClick = {
                     ctx.store.deleteCar(car)

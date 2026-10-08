@@ -34,6 +34,7 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Share
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -41,6 +42,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -455,16 +457,14 @@ fun DetailScreen(ctx: AppCtx, id: String) {
         return
     }
     val total = car.payments.sumOf { it.amount }
+    val owner = ctx.store.isActiveOwner()
+    var showDel by remember { mutableStateOf(false) }
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp)) {
         ScreenBar(title = L.s("ملف العربية", "Vehicle file"), onBack = { ctx.go(Dest.Cars) }, action = {
             Row {
                 IconButton(onClick = { Transfer.exportOne(context, car, L, ctx.store.activeUserName) }) { Icon(Icons.Filled.Share, contentDescription = "export") }
                 IconButton(onClick = { ctx.go(Dest.Edit(id)) }) { Icon(Icons.Filled.Edit, contentDescription = "edit") }
-                IconButton(onClick = {
-                    ctx.store.deleteCar(car)
-                    ctx.store.addLog(ctx.store.activeUserName, "delete", car.plate, L.s("حذف عربية", "Deleted car"))
-                    ctx.bump(); ctx.go(Dest.Cars)
-                }) { Icon(Icons.Filled.Delete, contentDescription = "delete", tint = Red) }
+                IconButton(onClick = { showDel = true }) { Icon(Icons.Filled.Delete, contentDescription = "delete", tint = Red) }
             }
         })
         Surface(shape = RoundedCornerShape(18.dp), color = Color(0xFF111827), modifier = Modifier.fillMaxWidth()) {
@@ -519,6 +519,34 @@ fun DetailScreen(ctx: AppCtx, id: String) {
             }
         }
         Spacer(Modifier.height(26.dp))
+    }
+
+    if (showDel) {
+        AlertDialog(
+            onDismissRequest = { showDel = false },
+            title = { Text(if (owner) L.s("حذف نهائي", "Delete permanently") else L.s("إزالة من الجهاز", "Remove from this phone")) },
+            text = {
+                Text(
+                    if (owner) L.s("هتحذف العربية نهائيًا من درايف ومن كل الأجهزة. متأكد؟", "This deletes the car permanently from Drive and all devices. Are you sure?")
+                    else L.s("هتختفي من جهازك بس، وهتفضل محفوظة على جوجل ومش بتنمسح. متأكد؟", "It disappears from your phone only and stays saved on Google — it is not deleted. Are you sure?"),
+                    fontSize = 14.sp,
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    showDel = false
+                    if (owner) {
+                        ctx.store.deleteCar(car)
+                        ctx.store.addLog(ctx.store.activeUserName, "delete", car.plate, L.s("حذف عربية", "Deleted car"))
+                    } else {
+                        ctx.store.hideCar(car)
+                        ctx.store.addLog(ctx.store.activeUserName, "hide", car.plate, L.s("إزالة من الجهاز فقط", "Hidden on this phone only"))
+                    }
+                    ctx.bump(); ctx.go(Dest.Cars)
+                }) { Text(if (owner) L.s("حذف", "Delete") else L.s("إزالة", "Remove"), fontWeight = FontWeight.Bold, color = Red) }
+            },
+            dismissButton = { TextButton(onClick = { showDel = false }) { Text(L.s("إلغاء", "Cancel")) } },
+        )
     }
 }
 

@@ -195,7 +195,7 @@ fun App(incoming: MutableState<Uri?>? = null) {
 
     val dir = if (lang == "ar") LayoutDirection.Rtl else LayoutDirection.Ltr
     CompositionLocalProvider(LocalLang provides L, LocalLayoutDirection provides dir) {
-        MechanicusTheme(dark) {
+        MechanicusTheme(true) {
             Box(
                 Modifier.fillMaxSize().background(
                     Brush.verticalGradient(listOf(Color(0xFF3A0C12), Color(0xFF14060A), Color(0xFF060304)))

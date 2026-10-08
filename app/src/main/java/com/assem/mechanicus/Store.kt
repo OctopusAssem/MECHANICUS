@@ -46,6 +46,13 @@ class Store(private val ctx: Context) {
         get() = prefs.getLong("last_sync", 0L)
         set(v) = prefs.edit().putLong("last_sync", v).apply()
 
+    // Shared Drive folder id. When set, every phone (any Google account that the
+    // folder is shared with) syncs to the SAME folder, so different Google
+    // accounts can see the same data.
+    var driveFolderId: String
+        get() = prefs.getString("drive_folder", "")!!
+        set(v) = prefs.edit().putString("drive_folder", v).apply()
+
     // True when local data changed and still needs to reach Drive.
     var syncPending: Boolean
         get() = prefs.getBoolean("sync_pending", false)

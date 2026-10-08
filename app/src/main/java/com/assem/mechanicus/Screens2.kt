@@ -1,6 +1,8 @@
 package com.assem.mechanicus
 
 import android.widget.Toast
+import android.content.Intent
+import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import com.google.android.gms.auth.api.signin.GoogleSignIn
@@ -261,6 +263,7 @@ fun SettingsScreen(ctx: AppCtx) {
     var email by remember { mutableStateOf(ctx.store.driveEmail) }
     var sizeText by remember { mutableStateOf(humanSize(ctx.store.totalSize())) }
     var newPin by remember { mutableStateOf("") }
+    var folderId by remember { mutableStateOf(ctx.store.driveFolderId) }
 
     val importLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) {
@@ -339,6 +342,44 @@ fun SettingsScreen(ctx: AppCtx) {
                 label = { Text(L.s("إيميل الدرايف (قابل للتغيير)", "Drive email (editable)"), fontSize = 12.sp) },
                 singleLine = true, shape = RoundedCornerShape(13.dp), modifier = Modifier.fillMaxWidth(),
             )
+        }
+
+        SectionTitle(L.s("مشاركة البيانات بين الحسابات", "Share data between accounts"))
+        CardBox {
+            Text(
+                L.s("افتح فولدر MECHANICUS على درايف من حساب الورشة، اعمله مشاركة (Editor) مع أي حساب جوجل تاني، وبعدين الصق «معرّف الفولدر» هنا في كل الأجهزة — كده كل الأجهزة تشوف نفس البيانات حتى لو كل واحد بحساب جوجل مختلف.",
+                    "Open the MECHANICUS folder on Drive from the shop account, share it as Editor with any other Google account, then paste the folder ID here on every phone — so all phones see the same data even with different Google accounts."),
+                color = Muted, fontSize = 11.5.sp, modifier = Modifier.padding(bottom = 8.dp),
+            )
+            Field(L.s("معرّف الفولدر (Folder ID)", "Folder ID"), folderId, { folderId = it })
+            Spacer(Modifier.height(8.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                PrimaryButton(L.s("حفظ المعرّف", "Save ID"), Modifier.weight(1f)) {
+                    val v = folderId.trim().substringAfterLast("/folders/").substringAfterLast("id=").trim('/')
+                    if (v.isBlank()) {
+                        ctx.store.driveFolderId = ""
+                        Toast.makeText(context, L.s("اتمسح ✅", "Cleared ✅"), Toast.LENGTH_SHORT).show()
+                    } else {
+                        ctx.store.driveFolderId = v
+                        folderId = v
+                        Toast.makeText(context, L.s("تم الحفظ ✅", "Saved ✅"), Toast.LENGTH_SHORT).show()
+                    }
+                    ctx.bump()
+                }
+                if (folderId.isNotBlank()) {
+                    GhostButton(L.s("فتح على درايف", "Open on Drive"), Modifier.weight(1f)) {
+                        val id = folderId.trim().substringAfterLast("/folders/").substringAfterLast("id=").trim('/')
+                        val u = "https://drive.google.com/drive/folders/$id"
+                        try { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(u))) } catch (_: Exception) {}
+                    }
+                }
+            }
+            if (ctx.store.driveFolderId.isNotBlank()) {
+                Text(
+                    L.s("المعرّف الحالي: ", "Current ID: ") + ctx.store.driveFolderId,
+                    color = Muted, fontSize = 10.5.sp, modifier = Modifier.padding(top = 8.dp),
+                )
+            }
         }
 
         SectionTitle(L.s("الأمان", "Security"))

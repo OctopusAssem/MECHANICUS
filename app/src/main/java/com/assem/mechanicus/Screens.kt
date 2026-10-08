@@ -31,6 +31,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.DirectionsCar
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Share
@@ -158,23 +159,25 @@ fun HomeScreen(ctx: AppCtx) {
             }
         }
         item { SectionTitle(L.s("إجراءات سريعة", "Quick actions")) }
+        val mgr = ctx.store.isManager()
         item {
             Row(horizontalArrangement = Arrangement.spacedBy(11.dp)) {
                 QuickAction("🚗", L.s("إضافة عربية", "Add car"), Modifier.weight(1f)) { ctx.go(Dest.Edit(null)) }
-                QuickAction("💰", L.s("تسجيل دفعة", "Record payment"), Modifier.weight(1f)) { ctx.go(Dest.Payments) }
-                QuickAction("📤", L.s("تصدير جلسة اليوم", "Export today"), Modifier.weight(1f)) {
-                    Transfer.exportToday(context, ctx.store, L, ctx.store.activeUserName)
-                }
+                if (mgr) QuickAction("💰", L.s("تسجيل دفعة", "Record payment"), Modifier.weight(1f)) { ctx.go(Dest.Payments) }
+                QuickAction("🔍", L.s("بحث عن عميل", "Find customer"), Modifier.weight(1f)) { ctx.go(Dest.Cars) }
             }
         }
         item {
             Spacer(Modifier.height(11.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(11.dp)) {
-                QuickAction("🔍", L.s("بحث عن عميل", "Find customer"), Modifier.weight(1f)) { ctx.go(Dest.Cars) }
-                QuickAction("📜", L.s("السجل", "Log"), Modifier.weight(1f)) { ctx.go(Dest.Logs) }
+                if (mgr) QuickAction("📜", L.s("السجل", "Log"), Modifier.weight(1f)) { ctx.go(Dest.Logs) }
                 QuickAction("☁️", L.s("صلاحيات درايف", "Drive"), Modifier.weight(1f)) { ctx.go(Dest.Sync) }
+                if (mgr) QuickAction("📤", L.s("تصدير جلسة اليوم", "Export today"), Modifier.weight(1f)) {
+                    Transfer.exportToday(context, ctx.store, L, ctx.store.activeUserName)
+                }
             }
         }
+        if (mgr) {
         item {
             Row(
                 Modifier.fillMaxWidth().clickable { showSummary = !showSummary }.padding(top = 18.dp, bottom = 8.dp),
@@ -196,9 +199,10 @@ fun HomeScreen(ctx: AppCtx) {
                 }
             }
         }
+        }
         item { SectionTitle(L.s("أحدث العربيات", "Recent cars")) }
         if (recent.isEmpty()) item { EmptyNote(L.s("لا يوجد عربيات بعد", "No cars yet")) }
-        items(recent) { row -> CarListItem(row) { ctx.go(Dest.Detail(row.id)) } }
+        items(recent) { row -> CarListItem(row, ctx.store.isManager()) { ctx.go(Dest.Detail(row.id)) } }
     }
 }
 
@@ -254,13 +258,13 @@ fun CarsScreen(ctx: AppCtx) {
         Spacer(Modifier.height(8.dp))
         if (rows.isEmpty()) EmptyNote(L.s("لا نتائج", "No results"))
         LazyColumn(contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = 20.dp)) {
-            items(rows) { row -> CarListItem(row) { ctx.go(Dest.Detail(row.id)) } }
+            items(rows) { row -> CarListItem(row, ctx.store.isManager()) { ctx.go(Dest.Detail(row.id)) } }
         }
     }
 }
 
 @Composable
-fun CarListItem(row: IndexRow, onClick: () -> Unit) {
+fun CarListItem(row: IndexRow, showMoney: Boolean = true, onClick: () -> Unit) {
     Surface(
         shape = RoundedCornerShape(16.dp),
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
@@ -286,8 +290,12 @@ fun CarListItem(row: IndexRow, onClick: () -> Unit) {
                 )
             }
             Column(horizontalAlignment = Alignment.End) {
-                Text(money(row.pay), color = Green, fontWeight = FontWeight.Black, fontSize = 15.sp)
-                Text(LocalLang.current.s("ج.م", "EGP"), color = Muted, fontSize = 10.sp)
+                if (showMoney) {
+                    Text(money(row.pay), color = Green, fontWeight = FontWeight.Black, fontSize = 15.sp)
+                    Text(LocalLang.current.s("ج.م", "EGP"), color = Muted, fontSize = 10.sp)
+                } else {
+                    Icon(Icons.Filled.DirectionsCar, contentDescription = null, tint = Muted)
+                }
             }
         }
     }
@@ -401,7 +409,7 @@ fun EditCarScreen(ctx: AppCtx, id: String?) {
             Field(L.s("قطع الغيار (افصل بفاصلة)", "Spare parts (comma separated)"), parts, { parts = it }, singleLine = false, minLines = 2)
         }
 
-        if (id == null) {
+        if (id == null && ctx.store.isManager()) {
             CardBox {
                 SectionTitle(L.s("دفعة مبدئية (اختياري)", "Initial payment (optional)"))
                 Field(L.s("المبلغ", "Amount"), payNow, { payNow = it }, keyboardType = KeyboardType.Number, digitsOnly = true)
@@ -496,6 +504,7 @@ fun DetailScreen(ctx: AppCtx, id: String) {
         }
         SectionTitle(L.s("قطع الغيار", "Spare parts"))
         CardBox { Text(if (car.parts.isEmpty()) "—" else car.parts.joinToString(" • "), fontSize = 13.sp) }
+        if (ctx.store.isManager()) {
         SectionTitle(L.s("المدفوعات", "Payments") + " (" + money(total) + " " + L.s("ج.م", "EGP") + ")")
         CardBox {
             if (car.payments.isEmpty()) Text(L.s("لا مدفوعات بعد", "No payments yet"), color = Muted, fontSize = 13.sp)
@@ -509,14 +518,17 @@ fun DetailScreen(ctx: AppCtx, id: String) {
                 }
             }
         }
+        }
         Spacer(Modifier.height(12.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            if (ctx.store.isManager()) {
             Surface(
                 color = MaterialTheme.colorScheme.surface,
                 shape = RoundedCornerShape(15.dp),
                 border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
                 modifier = Modifier.weight(1f).clickable { ctx.go(Dest.Payments) },
             ) { Text(L.s("تسجيل دفعة", "Add payment"), textAlign = androidx.compose.ui.text.style.TextAlign.Center, fontWeight = FontWeight.Bold, modifier = Modifier.padding(14.dp)) }
+            }
             PrimaryButton(
                 text = if (car.status == Status.DONE) L.s("إرجاع لجاري", "Reopen") else L.s("تم التسليم", "Mark delivered"),
                 modifier = Modifier.weight(1f),

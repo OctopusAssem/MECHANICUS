@@ -147,6 +147,7 @@ fun App(incoming: MutableState<Uri?>? = null) {
     val L = Lang(lang == "ar")
 
     fun navigate(d: Dest) {
+        if (d == Dest.Payments && !store.isManager()) return
         val root = d == Dest.Home || d == Dest.Cars || d == Dest.Payments || d == Dest.Settings || d == Dest.Login
         if (root) backStack.clear() else backStack.add(dest)
         dest = d
@@ -290,12 +291,12 @@ fun App(incoming: MutableState<Uri?>? = null) {
 fun BottomBar(ctx: AppCtx, dest: Dest) {
     val L = ctx.L
     NavigationBar(containerColor = MaterialTheme.colorScheme.surface) {
-        val items = listOf(
-            Triple(Dest.Home, Icons.Filled.Home, L.s("الرئيسية", "Home")),
-            Triple(Dest.Cars, Icons.Filled.DirectionsCar, L.s("العربيات", "Cars")),
-            Triple(Dest.Payments, Icons.Filled.Payments, L.s("المدفوعات", "Payments")),
-            Triple(Dest.Settings, Icons.Filled.Settings, L.s("الإعدادات", "Settings")),
-        )
+        val items = buildList {
+            add(Triple(Dest.Home, Icons.Filled.Home, L.s("الرئيسية", "Home")))
+            add(Triple(Dest.Cars, Icons.Filled.DirectionsCar, L.s("العربيات", "Cars")))
+            if (ctx.store.isManager()) add(Triple(Dest.Payments, Icons.Filled.Payments, L.s("المدفوعات", "Payments")))
+            add(Triple(Dest.Settings, Icons.Filled.Settings, L.s("الإعدادات", "Settings")))
+        }
         for ((d, icon, label) in items) {
             NavigationBarItem(
                 selected = dest == d,

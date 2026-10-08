@@ -58,6 +58,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -166,7 +167,7 @@ fun PaymentsScreen(ctx: AppCtx) {
 fun UsersScreen(ctx: AppCtx) {
     val L = ctx.L
     val context = LocalContext.current
-    val users = remember(ctx.version) { ctx.store.users() }
+    val users = remember(ctx.version) { ctx.store.visibleUsers() }
     var name by remember { mutableStateOf("") }
     var pin by remember { mutableStateOf("") }
     var role by remember { mutableStateOf("tech") }
@@ -328,6 +329,37 @@ fun actionLabel(L: Lang, action: String): String = when (action) {
 }
 
 // ------------------------- SETTINGS -------------------------
+// Secret owner unlock: a small octopus in the bottom corner of the Settings page.
+// Tapping it 7 times (gaps under 1.5s) while signed in as the owner toggles the
+// real admin powers. Anyone else gets a plain 🐙 toast.
+@Composable
+fun OwnerUnlockOctopus(ctx: AppCtx) {
+    val L = ctx.L
+    val context = LocalContext.current
+    var taps by remember { mutableStateOf(0) }
+    var last by remember { mutableStateOf(0L) }
+    Box(
+        Modifier.size(34.dp).clip(RoundedCornerShape(50)).clickable {
+            val now = System.currentTimeMillis()
+            if (now - last > 1500L) taps = 0
+            last = now
+            taps++
+            if (taps >= 7) {
+                taps = 0
+                if (ctx.store.isOwner(ctx.store.activeUserName)) {
+                    ctx.store.adminMode = !ctx.store.adminMode
+                    ctx.store.addLog(ctx.store.activeUserName, "user", "", if (ctx.store.adminMode) "admin unlock" else "admin lock")
+                    ctx.bump()
+                    Toast.makeText(context, if (ctx.store.adminMode) L.s("أهلاً يا مسؤول 🔧", "Welcome, admin 🔧") else L.s("تم قفل صلاحيات المسؤول", "Admin locked"), Toast.LENGTH_SHORT).show()
+                } else {
+                    Toast.makeText(context, "🐙", Toast.LENGTH_SHORT).show()
+                }
+            }
+        },
+        contentAlignment = Alignment.Center,
+    ) { Text("🐙", fontSize = 20.sp, modifier = Modifier.alpha(0.45f)) }
+}
+
 @Composable
 fun SettingsScreen(ctx: AppCtx) {
     val L = ctx.L
@@ -740,6 +772,10 @@ fun SettingsScreen(ctx: AppCtx) {
 
         Spacer(Modifier.height(16.dp))
         Text("MECHANICUS v" + appVersion(context) + " • " + L.s("صناعة عاصم حسين", "by Assem Hussein"), color = Muted, fontSize = 12.sp, modifier = Modifier.fillMaxWidth().padding(bottom = 26.dp), textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+
+        Box(Modifier.fillMaxWidth().padding(bottom = 14.dp), contentAlignment = Alignment.CenterEnd) {
+            OwnerUnlockOctopus(ctx)
+        }
     }
 
     if (dbAction.isNotBlank()) {

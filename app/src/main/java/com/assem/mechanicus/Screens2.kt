@@ -258,7 +258,6 @@ fun SettingsScreen(ctx: AppCtx) {
     val L = ctx.L
     val context = LocalContext.current
     var external by remember { mutableStateOf(ctx.store.useExternal) }
-    var dark by remember { mutableStateOf(ctx.store.dark) }
     var email by remember { mutableStateOf(ctx.store.driveEmail) }
     var sizeText by remember { mutableStateOf(humanSize(ctx.store.totalSize())) }
     var newPin by remember { mutableStateOf("") }
@@ -322,6 +321,10 @@ fun SettingsScreen(ctx: AppCtx) {
                     FilterChip(selected = ctx.lang == "ar", onClick = { ctx.setLang("ar") }, label = { Text("العربية", fontSize = 12.sp) })
                     FilterChip(selected = ctx.lang == "en", onClick = { ctx.setLang("en") }, label = { Text("English", fontSize = 12.sp) })
                 }
+            }
+            Row(Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                Text(L.s("الوضع الليلي", "Dark mode"), fontWeight = FontWeight.Bold, fontSize = 14.sp, modifier = Modifier.weight(1f))
+                Switch(checked = ctx.dark, onCheckedChange = { ctx.setDark(it) })
             }
             Row(Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                 Text(L.s("صلاحيات ومزامنة جوجل", "Google permissions & sync"), fontWeight = FontWeight.Bold, fontSize = 14.sp, modifier = Modifier.weight(1f))

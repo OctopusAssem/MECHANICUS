@@ -20,7 +20,7 @@ import java.util.Locale
 import java.util.TimeZone
 
 object GDrive {
-    const val SCOPE = "https://www.googleapis.com/auth/drive.file"
+    const val SCOPE = "https://www.googleapis.com/auth/drive"
     const val FOLDER = "MECHANICUS"
     private const val API = "https://www.googleapis.com/drive/v3/files"
     private const val UPLOAD = "https://www.googleapis.com/upload/drive/v3/files"
@@ -77,14 +77,34 @@ object GDrive {
         return 0L
     }
 
-    fun findOrCreateFolder(token: String): String {
+    fun findOrCreateFolder(token: String, preferredId: String? = null): String {
+        val pref = preferredId?.trim().orEmpty()
+        if (pref.isNotBlank()) {
+            // Use the explicitly shared folder. Works for ANY Google account the
+            // folder has been shared with (Editor), so several phones with
+            // different Google accounts can share the same data.
+            val c = open("$API/$pref?fields=id&supportsAllDrives=true", token, "GET")
+            val b = readAll(c)
+            if (c.responseCode in 200..299) return pref
+            throw RuntimeException("Drive folder not accessible (${c.responseCode}). اتأكد إن الفولدر متشارَك مع الحساب ده كـEditor: $b")
+        }
         val q = URLEncoder.encode("name='$FOLDER' and mimeType='application/vnd.google-apps.folder' and trashed=false", "UTF-8")
-        val c = open("$API?q=$q&fields=files(id,name)&spaces=drive", token, "GET")
+        val c = open("$API?q=$q&fields=files(id,name,capabilities(canAddChildren))&spaces=drive&supportsAllDrives=true&includeItemsFromAllDrives=true&pageSize=100", token, "GET")
         val body = readAll(c)
         if (c.responseCode !in 200..299) throw RuntimeException("Drive list failed: ${c.responseCode} $body")
         val files = JSONObject(body).optJSONArray("files")
-        if (files != null && files.length() > 0) return files.getJSONObject(0).getString("id")
-        val c2 = open("$API?fields=id", token, "POST")
+        if (files != null && files.length() > 0) {
+            var fallback: String? = null
+            for (i in 0 until files.length()) {
+                val o = files.getJSONObject(i)
+                val id = o.getString("id")
+                if (fallback == null) fallback = id
+                val can = o.optJSONObject("capabilities")?.optBoolean("canAddChildren", false) ?: false
+                if (can) return id // owned or shared as Editor — writable
+            }
+            fallback?.let { return it }
+        }
+        val c2 = open("$API?fields=id&supportsAllDrives=true", token, "POST")
         c2.doOutput = true
         c2.setRequestProperty("Content-Type", "application/json; charset=UTF-8")
         c2.outputStream.use { it.write("{\"name\":\"$FOLDER\",\"mimeType\":\"application/vnd.google-apps.folder\"}".toByteArray()) }

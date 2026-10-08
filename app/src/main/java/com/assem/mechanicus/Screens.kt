@@ -1,6 +1,9 @@
 package com.assem.mechanicus
 
+import android.Manifest
 import android.graphics.BitmapFactory
+import android.net.Uri
+import android.os.Build
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -39,6 +42,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -55,6 +59,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
 import java.io.File
 import java.text.SimpleDateFormat
@@ -77,9 +82,18 @@ fun ScreenBar(title: String, onBack: (() -> Unit)? = null, action: (@Composable 
 
 @Composable
 fun PhotoThumb(path: String?, onClick: () -> Unit) {
+    val context = LocalContext.current
     val bmp = remember(path) {
-        val p = path?.let { File(it) }
-        if (p != null && p.exists() && p.length() > 0) BitmapFactory.decodeFile(p.absolutePath)?.asImageBitmap() else null
+        try {
+            when {
+                path.isNullOrBlank() -> null
+                path.startsWith("content://") -> BitmapFactory.decodeStream(context.contentResolver.openInputStream(Uri.parse(path)))?.asImageBitmap()
+                else -> {
+                    val p = File(path)
+                    if (p.exists() && p.length() > 0) BitmapFactory.decodeFile(p.absolutePath)?.asImageBitmap() else null
+                }
+            }
+        } catch (_: Exception) { null }
     }
     Surface(
         shape = RoundedCornerShape(14.dp),
@@ -301,15 +315,37 @@ fun EditCarScreen(ctx: AppCtx, id: String?) {
     var pendingFile by remember { mutableStateOf<File?>(null) }
 
     val camera = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { ok ->
-        if (ok) photo = pendingFile?.absolutePath else pendingFile?.delete()
+        val f = pendingFile
+        if (ok && f != null) {
+            val name = "MECHANICUS_plate_${System.currentTimeMillis()}.jpg"
+            val g = Gallery.saveFile(context, f, name)
+            photo = g ?: f.absolutePath
+            if (g != null) f.delete()
+        } else {
+            f?.delete()
+        }
     }
     val gallery = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
         if (uri != null) {
-            try {
-                val f = File(ctx.store.photosDir(), "plate_${System.currentTimeMillis()}.jpg")
-                context.contentResolver.openInputStream(uri)?.use { input -> f.outputStream().use { input.copyTo(it) } }
-                photo = f.absolutePath
-            } catch (_: Exception) {}
+            val name = "MECHANICUS_plate_${System.currentTimeMillis()}.jpg"
+            val g = Gallery.saveUri(context, uri, name)
+            if (g != null) {
+                photo = g
+            } else {
+                try {
+                    val f = File(ctx.store.photosDir(), name)
+                    context.contentResolver.openInputStream(uri)?.use { input -> f.outputStream().use { input.copyTo(it) } }
+                    photo = f.absolutePath
+                } catch (_: Exception) {}
+            }
+        }
+    }
+    val permLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { }
+    LaunchedEffect(Unit) {
+        if (Build.VERSION.SDK_INT < 29 &&
+            ContextCompat.checkSelfPermission(context, Manifest.permission.WRITE_EXTERNAL_STORAGE) != android.content.pm.PackageManager.PERMISSION_GRANTED
+        ) {
+            permLauncher.launch(Manifest.permission.WRITE_EXTERNAL_STORAGE)
         }
     }
 

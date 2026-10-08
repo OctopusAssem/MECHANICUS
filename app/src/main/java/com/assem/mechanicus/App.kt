@@ -28,6 +28,7 @@ import androidx.compose.material.icons.filled.DirectionsCar
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Payments
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
@@ -35,6 +36,7 @@ import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
@@ -128,6 +130,7 @@ fun App(incoming: MutableState<Uri?>? = null) {
     var dest by remember { mutableStateOf<Dest>(Dest.Splash) }
     val backStack = remember { mutableStateListOf<Dest>() }
     var version by remember { mutableStateOf(0) }
+    var showExit by remember { mutableStateOf(false) }
     val L = Lang(lang == "ar")
 
     fun navigate(d: Dest) {
@@ -183,6 +186,9 @@ fun App(incoming: MutableState<Uri?>? = null) {
     BackHandler(enabled = backStack.isNotEmpty()) {
         dest = backStack.removeAt(backStack.lastIndex)
     }
+    BackHandler(enabled = backStack.isEmpty() && (dest == Dest.Home || dest == Dest.Cars || dest == Dest.Payments || dest == Dest.Settings)) {
+        showExit = true
+    }
 
     val dir = if (lang == "ar") LayoutDirection.Rtl else LayoutDirection.Ltr
     CompositionLocalProvider(LocalLang provides L, LocalLayoutDirection provides dir) {
@@ -207,6 +213,41 @@ fun App(incoming: MutableState<Uri?>? = null) {
                     val showBar = dest == Dest.Home || dest == Dest.Cars || dest == Dest.Payments || dest == Dest.Settings
                     if (showBar) BottomBar(ctx, dest)
                 }
+            }
+            if (showExit) {
+                val pending = store.syncPending
+                AlertDialog(
+                    onDismissRequest = { showExit = false },
+                    title = { Text(L.s("الخروج من البرنامج", "Exit app")) },
+                    text = {
+                        Text(
+                            when {
+                                pending && store.driveConnected -> L.s("فيه تغييرات لسه متزامنتش مع درايف. تحب تزامن قبل الخروج؟", "There are changes not synced to Drive yet. Sync before exiting?")
+                                pending -> L.s("فيه تغييرات متزامنتش (مفيش اتصال بدرايف). تخرج عادي؟", "There are unsynced changes (Drive not connected). Exit anyway?")
+                                else -> L.s("كل حاجة متزامنة. تحب تقفل البرنامج؟", "Everything is synced. Close the app?")
+                            },
+                            fontSize = 14.sp,
+                        )
+                    },
+                    confirmButton = {
+                        if (pending && store.driveConnected) {
+                            TextButton(onClick = {
+                                showExit = false
+                                scope.launch {
+                                    withContext(Dispatchers.IO) { try { AutoSync.run(context, store) } catch (_: Exception) {} }
+                                    (context as? android.app.Activity)?.finish()
+                                }
+                            }) { Text(L.s("مزامنة وخروج", "Sync & exit"), fontWeight = FontWeight.Bold) }
+                        } else {
+                            TextButton(onClick = { showExit = false; (context as? android.app.Activity)?.finish() }) {
+                                Text(L.s("موافق للخروج", "Exit"), fontWeight = FontWeight.Bold)
+                            }
+                        }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = { showExit = false }) { Text(L.s("إلغاء", "Cancel")) }
+                    },
+                )
             }
         }
     }

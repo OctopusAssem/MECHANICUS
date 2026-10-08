@@ -33,6 +33,10 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.filled.LockReset
+import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.LockOpen
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FilterChip
@@ -43,6 +47,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -55,6 +60,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import java.text.SimpleDateFormat
@@ -162,9 +168,16 @@ fun UsersScreen(ctx: AppCtx) {
     var name by remember { mutableStateOf("") }
     var pin by remember { mutableStateOf("") }
     var role by remember { mutableStateOf("tech") }
+    var resetTarget by remember { mutableStateOf<User?>(null) }
 
     LazyColumn(Modifier.fillMaxSize().padding(horizontal = 16.dp), contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = 20.dp)) {
         item { ScreenBar(title = L.s("المستخدمون", "Users"), onBack = { ctx.go(Dest.Settings) }) }
+        if (users.isNotEmpty()) item {
+            Text(
+                L.s("لو موظف نسي الرقم السري، دوس على القفل جنبه وحط باسورد المسؤول والرقم الجديد.", "If an employee forgot his PIN, tap the lock next to him and enter the admin password plus the new PIN."),
+                color = Muted, fontSize = 11.5.sp, modifier = Modifier.padding(bottom = 6.dp),
+            )
+        }
         items(users) { u ->
             Surface(
                 shape = RoundedCornerShape(14.dp),
@@ -180,6 +193,9 @@ fun UsersScreen(ctx: AppCtx) {
                     Column(Modifier.weight(1f)) {
                         Text(u.name, fontWeight = FontWeight.Bold, fontSize = 14.sp)
                         Text((if (u.role == "admin") L.s("مدير", "Manager") else L.s("فني", "Technician")) + " • PIN ••••", color = Muted, fontSize = 11.sp)
+                    }
+                    IconButton(onClick = { resetTarget = u }) {
+                        Icon(Icons.Filled.LockReset, contentDescription = "reset PIN", tint = Blue)
                     }
                     if (u.id != ctx.store.activeUserId) IconButton(onClick = {
                         ctx.store.deleteUser(u.id); ctx.bump()
@@ -212,6 +228,61 @@ fun UsersScreen(ctx: AppCtx) {
             }
         }
     }
+
+    resetTarget?.let { target ->
+        ResetPinDialog(ctx, target.id, target.name) { resetTarget = null }
+    }
+}
+
+// Admin-only: change an employee's forgotten PIN. The admin password is the
+// owner's secret, so only the owner can do it — even if anyone has the phone.
+@Composable
+fun ResetPinDialog(ctx: AppCtx, userId: Long, userName: String, onClose: () -> Unit) {
+    val L = ctx.L
+    val context = LocalContext.current
+    var pass by remember { mutableStateOf("") }
+    var np by remember { mutableStateOf("") }
+    var err by remember { mutableStateOf("") }
+    AlertDialog(
+        onDismissRequest = onClose,
+        title = { Text(L.s("إعادة تعيين الرقم السري", "Reset PIN")) },
+        text = {
+            Column {
+                Text(L.s("للموظف: ", "For: ") + userName, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                Spacer(Modifier.height(6.dp))
+                Text(L.s("اكتب باسورد المسؤول والرقم السري الجديد.", "Enter the admin password and the new PIN."), color = Muted, fontSize = 12.sp)
+                Spacer(Modifier.height(10.dp))
+                OutlinedTextField(
+                    value = pass,
+                    onValueChange = { pass = it; err = "" },
+                    label = { Text(L.s("باسورد المسؤول", "Admin password"), fontSize = 12.sp) },
+                    singleLine = true,
+                    visualTransformation = PasswordVisualTransformation(),
+                    shape = RoundedCornerShape(13.dp),
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Spacer(Modifier.height(8.dp))
+                Field(L.s("رقم سري جديد (4 أرقام)", "New PIN (4 digits)"), np, { np = it }, keyboardType = KeyboardType.Number, digitsOnly = true, maxLen = 4)
+                if (err.isNotEmpty()) Text(err, color = Red, fontSize = 12.sp, modifier = Modifier.padding(top = 6.dp))
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = {
+                when {
+                    !ctx.store.verifyAdminPass(pass) -> err = L.s("باسورد المسؤول غلط", "Wrong admin password")
+                    np.length != 4 -> err = L.s("اكتب رقم سري من 4 أرقام", "Enter a 4-digit PIN")
+                    else -> {
+                        ctx.store.setPin(userId, np)
+                        ctx.store.addLog(ctx.store.activeUserName.ifBlank { "admin" }, "user", "", L.s("إعادة تعيين رقم سري لـ ", "Reset PIN for ") + userName)
+                        ctx.bump()
+                        Toast.makeText(context, L.s("تم تعيين الرقم السري ✅", "PIN updated ✅"), Toast.LENGTH_SHORT).show()
+                        onClose()
+                    }
+                }
+            }) { Text(L.s("حفظ", "Save"), fontWeight = FontWeight.Bold, color = Red) }
+        },
+        dismissButton = { TextButton(onClick = onClose) { Text(L.s("إلغاء", "Cancel")) } },
+    )
 }
 
 // ------------------------- LOGS -------------------------
@@ -264,6 +335,12 @@ fun SettingsScreen(ctx: AppCtx) {
     var sizeText by remember { mutableStateOf(humanSize(ctx.store.totalSize())) }
     var newPin by remember { mutableStateOf("") }
     var folderId by remember { mutableStateOf(ctx.store.driveFolderId) }
+    var adminNow by remember { mutableStateOf("") }
+    var adminNew by remember { mutableStateOf("") }
+    var dbAction by remember { mutableStateOf("") }
+    var dbPass by remember { mutableStateOf("") }
+    var dbErr by remember { mutableStateOf("") }
+    var dbOn by remember { mutableStateOf(ctx.store.dbProtected) }
 
     val importLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) {
@@ -404,6 +481,74 @@ fun SettingsScreen(ctx: AppCtx) {
             }
         }
 
+        SectionTitle(L.s("تأمين قاعدة البيانات", "Database protection"))
+        CardBox {
+            Row(Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    if (dbOn) Icons.Filled.Lock else Icons.Filled.LockOpen,
+                    contentDescription = null,
+                    tint = if (dbOn) (if (ctx.store.dbAuthorized) Green else Color(0xFFB45309)) else Muted,
+                )
+                Spacer(Modifier.size(8.dp))
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        if (dbOn) L.s("القاعدة محمية", "Database protected") else L.s("القاعدة غير محمية", "Database not protected"),
+                        fontWeight = FontWeight.Bold, fontSize = 14.sp,
+                    )
+                    Text(
+                        if (dbOn && ctx.store.dbAuthorized) L.s("هذا الجهاز مصرّح له بالوصول.", "This device is authorized.")
+                        else if (dbOn) L.s("هذا الجهاز مش مصرّح — مش هيقدر يزامن أو يتعامل مع القاعدة.", "This device is not authorized — it can't sync or touch the database.")
+                        else L.s("أي حد ينزّل البرنامج يقدر يستخدمه لنفسه. لو فعّلت الحماية، أي جهاز لازم تصريح منك بباسورد المسؤول.", "Anyone who installs the app can use it for themselves. If you turn protection on, each device needs your approval with the admin password."),
+                        color = Muted, fontSize = 11.5.sp,
+                    )
+                }
+            }
+            Spacer(Modifier.height(8.dp))
+            if (dbOn && !ctx.store.dbAuthorized) {
+                PrimaryButton(L.s("تصريح هذا الجهاز", "Authorize this device")) { dbAction = "auth"; dbPass = ""; dbErr = "" }
+                Spacer(Modifier.height(8.dp))
+            }
+            if (dbOn) {
+                GhostButton(L.s("إلغاء الحماية", "Turn off protection")) { dbAction = "off"; dbPass = ""; dbErr = "" }
+            } else {
+                PrimaryButton(L.s("تفعيل الحماية", "Turn on protection")) { dbAction = "on"; dbPass = ""; dbErr = "" }
+            }
+        }
+
+        SectionTitle(L.s("باسورد المسؤول", "Admin password"))
+        CardBox {
+            Text(
+                L.s("ده الباسورد السري اللي بيحمي قاعدة البيانات والصلاحيات المطلقة (زي إعادة تعيين رقم موظف نسي). افتراضيًا 5555 — غيّره لباسورد خاص بيك.", "This secret protects the database and absolute permissions (like resetting a forgotten employee PIN). Default is 5555 — change it to your own."),
+                color = Muted, fontSize = 11.5.sp, modifier = Modifier.padding(bottom = 8.dp),
+            )
+            OutlinedTextField(
+                value = adminNow, onValueChange = { adminNow = it },
+                label = { Text(L.s("الباسورد الحالي", "Current password"), fontSize = 12.sp) },
+                singleLine = true, visualTransformation = PasswordVisualTransformation(),
+                shape = RoundedCornerShape(13.dp), modifier = Modifier.fillMaxWidth(),
+            )
+            Spacer(Modifier.height(8.dp))
+            OutlinedTextField(
+                value = adminNew, onValueChange = { adminNew = it },
+                label = { Text(L.s("الباسورد الجديد", "New password"), fontSize = 12.sp) },
+                singleLine = true, visualTransformation = PasswordVisualTransformation(),
+                shape = RoundedCornerShape(13.dp), modifier = Modifier.fillMaxWidth(),
+            )
+            Spacer(Modifier.height(8.dp))
+            PrimaryButton(L.s("حفظ باسورد المسؤول", "Save admin password")) {
+                when {
+                    !ctx.store.verifyAdminPass(adminNow) -> Toast.makeText(context, L.s("الباسورد الحالي غلط", "Wrong current password"), Toast.LENGTH_SHORT).show()
+                    adminNew.trim().length < 4 -> Toast.makeText(context, L.s("اكتب باسورد جديد 4 حروف أو أرقام على الأقل", "Enter a new password of at least 4 characters"), Toast.LENGTH_SHORT).show()
+                    else -> {
+                        ctx.store.adminPass = adminNew.trim()
+                        ctx.store.addLog(ctx.store.activeUserName, "user", "", L.s("تغيير باسورد المسؤول", "Changed admin password"))
+                        adminNow = ""; adminNew = ""
+                        Toast.makeText(context, L.s("تم تغيير باسورد المسؤول ✅", "Admin password changed ✅"), Toast.LENGTH_SHORT).show()
+                    }
+                }
+            }
+        }
+
         SectionTitle(L.s("مشاركة البرنامج", "Share the app"))
         CardBox {
             Text(
@@ -505,6 +650,55 @@ fun SettingsScreen(ctx: AppCtx) {
 
         Spacer(Modifier.height(16.dp))
         Text("MECHANICUS v" + appVersion(context) + " • " + L.s("صناعة عاصم حسين", "by Assem Hussein"), color = Muted, fontSize = 12.sp, modifier = Modifier.fillMaxWidth().padding(bottom = 26.dp), textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+    }
+
+    if (dbAction.isNotBlank()) {
+        val title = when (dbAction) {
+            "on" -> L.s("تفعيل حماية قاعدة البيانات", "Turn on database protection")
+            "off" -> L.s("إلغاء حماية قاعدة البيانات", "Turn off database protection")
+            else -> L.s("تصريح هذا الجهاز", "Authorize this device")
+        }
+        AlertDialog(
+            onDismissRequest = { dbAction = "" },
+            title = { Text(title) },
+            text = {
+                Column {
+                    Text(
+                        when (dbAction) {
+                            "on" -> L.s("بعد التفعيل، أي جهاز تاني لازم تصريح منك بباسورد المسؤول قبل ما يزامن أو يتعامل مع القاعدة.", "After turning it on, any other device needs your approval with the admin password before it can sync or touch the database.")
+                            "off" -> L.s("هيرجع أي حد يقدر يزامن. اكتب باسورد المسؤول للتأكيد.", "This lets anyone sync again. Enter the admin password to confirm.")
+                            else -> L.s("اكتب باسورد المسؤول لتصريح الجهاز ده بالوصول للقاعدة.", "Enter the admin password to authorize this device to access the database.")
+                        },
+                        color = Muted, fontSize = 12.sp,
+                    )
+                    Spacer(Modifier.height(10.dp))
+                    OutlinedTextField(
+                        value = dbPass, onValueChange = { dbPass = it; dbErr = "" },
+                        label = { Text(L.s("باسورد المسؤول", "Admin password"), fontSize = 12.sp) },
+                        singleLine = true, visualTransformation = PasswordVisualTransformation(),
+                        shape = RoundedCornerShape(13.dp), modifier = Modifier.fillMaxWidth(),
+                    )
+                    if (dbErr.isNotEmpty()) Text(dbErr, color = Red, fontSize = 12.sp, modifier = Modifier.padding(top = 6.dp))
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    if (!ctx.store.verifyAdminPass(dbPass)) { dbErr = L.s("باسورد المسؤول غلط", "Wrong admin password"); return@TextButton }
+                    when (dbAction) {
+                        "on" -> { ctx.store.dbProtected = true; ctx.store.dbAuthorized = true }
+                        "off" -> { ctx.store.dbProtected = false; ctx.store.dbAuthorized = false }
+                        else -> ctx.store.dbAuthorized = true
+                    }
+                    dbOn = ctx.store.dbProtected
+                    ctx.store.addLog(ctx.store.activeUserName, "user", "", L.s("تأمين قاعدة البيانات: ", "Database protection: ") + dbAction)
+                    dbAction = ""
+                    ctx.bump()
+                    ctx.requestSync()
+                    Toast.makeText(context, L.s("تم ✅", "Done ✅"), Toast.LENGTH_SHORT).show()
+                }) { Text(L.s("تأكيد", "Confirm"), fontWeight = FontWeight.Bold, color = Red) }
+            },
+            dismissButton = { TextButton(onClick = { dbAction = "" }) { Text(L.s("إلغاء", "Cancel")) } },
+        )
     }
 }
 
@@ -610,9 +804,11 @@ fun SyncScreen(ctx: AppCtx) {
                                     }
                                 }
                                 busy = false
-                                status = if (res.error.isBlank())
-                                    L.s("تمت المزامنة ✅ — من جهازك ${res.uploaded} / من السحابة ${res.downloaded}", "Synced ✅ — from this phone ${res.uploaded} / from cloud ${res.downloaded}")
-                                else L.s("خطأ: ", "Error: ") + res.error
+                                status = when {
+                                    res.error.isBlank() -> L.s("تمت المزامنة ✅ — من جهازك ${res.uploaded} / من السحابة ${res.downloaded}", "Synced ✅ — from this phone ${res.uploaded} / from cloud ${res.downloaded}")
+                                    res.error == SyncEngine.LOCKED -> L.s("قاعدة البيانات محمية — لازم تصريح من المسؤول من الإعدادات قبل المزامنة.", "The database is protected — the admin must authorize this device in Settings before syncing.")
+                                    else -> L.s("خطأ: ", "Error: ") + res.error
+                                }
                                 ctx.bump()
                             }
                         }

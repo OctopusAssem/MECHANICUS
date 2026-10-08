@@ -200,7 +200,7 @@ fun App(incoming: MutableState<Uri?>? = null) {
         MechanicusTheme(dark) {
             Box(
                 Modifier.fillMaxSize().background(
-                    if (dark) Brush.verticalGradient(listOf(Color(0xFF3A0C12), Color(0xFF14060A), Color(0xFF060304)))
+                    if (dark) Brush.verticalGradient(listOf(Color(0xFF511722), Color(0xFF2C141C), Color(0xFF1A0F13)))
                     else Brush.verticalGradient(listOf(Color(0xFFFFFFFF), Color(0xFFF6F7FB), Color(0xFFECEFF6)))
                 )
             ) {
@@ -302,7 +302,7 @@ fun SplashScreen(onLaunch: () -> Unit) {
     Box(
         Modifier.fillMaxSize().background(
             Brush.radialGradient(
-                colors = listOf(Color(0xFF350D0D), Color(0xFF0A0505), Color(0xFF050506)),
+                colors = listOf(Color(0xFF4A1515), Color(0xFF1A0F13), Color(0xFF120A0E)),
             )
         )
     ) {

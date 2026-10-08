@@ -36,6 +36,8 @@ import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.LockReset
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.LockOpen
+import androidx.compose.material.icons.filled.CloudDone
+import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -341,6 +343,7 @@ fun SettingsScreen(ctx: AppCtx) {
     var dbPass by remember { mutableStateOf("") }
     var dbErr by remember { mutableStateOf("") }
     var dbOn by remember { mutableStateOf(ctx.store.dbProtected) }
+    var syncKey by remember { mutableStateOf("") }
 
     val importLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) {
@@ -477,6 +480,62 @@ fun SettingsScreen(ctx: AppCtx) {
                     Toast.makeText(context, L.s("تم تغيير الرقم السري ✅", "PIN changed ✅"), Toast.LENGTH_SHORT).show()
                 } else {
                     Toast.makeText(context, L.s("اكتب 4 أرقام", "Enter 4 digits"), Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
+
+        SectionTitle(L.s("مزامنة الشركة", "Company sync"))
+        CardBox {
+            val configured = ServiceAuth.isConfigured(context)
+            Row(Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    if (configured) Icons.Filled.CloudDone else Icons.Filled.CloudOff,
+                    contentDescription = null,
+                    tint = if (configured) Green else Color(0xFFB45309),
+                )
+                Spacer(Modifier.size(8.dp))
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        if (configured) L.s("المزامنة مفعّلة على الجهاز ده", "Sync is active on this device")
+                        else L.s("المزامنة محتاجة مفتاح الشركة", "Sync needs the company key"),
+                        fontWeight = FontWeight.Bold, fontSize = 14.sp,
+                    )
+                    Text(
+                        if (configured) L.s("متصل بحساب الشركة من غير أي تسجيل دخول جوجل.", "Connected to the company account with no Google sign-in.")
+                        else L.s("اكتب مفتاح الشركة (اللي معاك انت بس) مرة واحدة هنا عشان تفعّل المزامنة. من غير المفتاح، اللي معاه البرنامج لوحده مش هيقدر يزامن.", "Enter the company key (only you have it) once here to activate sync. Without it, having the app alone cannot sync."),
+                        color = Muted, fontSize = 11.5.sp,
+                    )
+                }
+            }
+            Spacer(Modifier.height(8.dp))
+            if (!configured) {
+                OutlinedTextField(
+                    value = syncKey, onValueChange = { syncKey = it },
+                    label = { Text(L.s("مفتاح الشركة", "Company key"), fontSize = 12.sp) },
+                    singleLine = true, visualTransformation = PasswordVisualTransformation(),
+                    shape = RoundedCornerShape(13.dp), modifier = Modifier.fillMaxWidth(),
+                )
+                Spacer(Modifier.height(8.dp))
+                PrimaryButton(L.s("تفعيل المزامنة", "Activate sync")) {
+                    if (ServiceAuth.provision(context, syncKey.trim())) {
+                        syncKey = ""
+                        ctx.store.driveConnected = true
+                        ctx.store.dbAuthorized = true
+                        ctx.store.addLog(ctx.store.activeUserName, "user", "", L.s("تفعيل مزامنة الشركة", "Activated company sync"))
+                        Toast.makeText(context, L.s("تم تفعيل المزامنة ✅", "Sync activated ✅"), Toast.LENGTH_SHORT).show()
+                        ctx.bump()
+                        ctx.requestSync()
+                    } else {
+                        Toast.makeText(context, L.s("مفتاح الشركة غلط", "Wrong company key"), Toast.LENGTH_SHORT).show()
+                    }
+                }
+            } else {
+                Text(ServiceAuth.email(context), color = Muted, fontSize = 12.sp)
+                Spacer(Modifier.height(8.dp))
+                GhostButton(L.s("فصل المزامنة عن الجهاز ده", "Disconnect sync on this device")) {
+                    ServiceAuth.clear(context)
+                    ctx.store.driveConnected = false
+                    ctx.bump()
                 }
             }
         }
@@ -749,7 +808,7 @@ fun SyncScreen(ctx: AppCtx) {
     val scope = rememberCoroutineScope()
     val store = ctx.store
     var account by remember(ctx.version) { mutableStateOf(GDrive.account(context)) }
-    val auto = ServiceAuth.isConfigured()
+    val auto = ServiceAuth.isConfigured(context)
     var busy by remember { mutableStateOf(false) }
     var status by remember { mutableStateOf("") }
     val files = remember(ctx.version) { store.dbFiles() }
@@ -777,7 +836,7 @@ fun SyncScreen(ctx: AppCtx) {
         CardBox {
             Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
                 Text("☁️", fontSize = 40.sp)
-                Text(if (auto) ServiceAuth.email() else (account?.email ?: store.driveEmail), fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                Text(if (auto) ServiceAuth.email(context) else (account?.email ?: store.driveEmail), fontWeight = FontWeight.Bold, fontSize = 15.sp)
                 Text(
                     when {
                         auto -> L.s("متصل تلقائيًا بحساب الشركة — مش مطلوب تسجيل دخول جوجل على الموبايل", "Auto-connected to the company account — no Google sign-in needed on the phone")
@@ -813,9 +872,12 @@ fun SyncScreen(ctx: AppCtx) {
                         }
                     }
                 } else {
-                    PrimaryButton(if (busy) L.s("جاري...", "Working...") else L.s("ربط حساب جوجل وطلب صلاحية درايف", "Connect Google & grant Drive")) {
-                        try { launcher.launch(GDrive.client(context).signInIntent) } catch (e: Exception) { status = e.message ?: "error" }
-                    }
+                    Text(
+                        L.s("المزامنة مش مفعّلة على الجهاز ده. افتح الإعدادات واكتب مفتاح الشركة مرة واحدة لتفعيلها.", "Sync isn't active on this device. Open Settings and enter the company key once to activate it."),
+                        color = Muted, fontSize = 12.sp, textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                    )
+                    Spacer(Modifier.height(10.dp))
+                    PrimaryButton(L.s("فتح الإعدادات لتفعيل المزامنة", "Open Settings to activate sync")) { ctx.go(Dest.Settings) }
                 }
                 Spacer(Modifier.height(8.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {

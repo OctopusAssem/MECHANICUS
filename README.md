@@ -37,3 +37,7 @@ Certificate SHA-1: `77:96:93:23:38:83:DF:04:43:64:FF:E4:7A:37:9F:FA:A6:75:91:97`
 ## License
 
 MIT — Assem Hussein.
+
+---
+
+**Maintained by [OctopusAssem](https://github.com/OctopusAssem) (عاصم حسين)** — 🌐 [octopusassem.github.io](https://octopusassem.github.io/)

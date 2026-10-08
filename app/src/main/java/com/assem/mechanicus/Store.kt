@@ -116,7 +116,7 @@ class Store(private val ctx: Context) {
     fun addLog(userName: String, action: String, plate: String, detail: String) {
         val db = openCentral()
         db.execSQL("INSERT INTO logs(ts,uname,action,plate,detail) VALUES(?,?,?,?,?)",
-            arrayOf(System.currentTimeMillis(), userName, action, plate, detail))
+            arrayOf<Any?>(System.currentTimeMillis(), userName, action, plate, detail))
         db.close()
     }
 
@@ -147,7 +147,7 @@ class Store(private val ctx: Context) {
         val db = openMonth(mk)
         db.execSQL(
             "INSERT OR REPLACE INTO cars(id,plate,engine,odometer,make,model,delivery,customer,phone,worker,intake,status,created,updated,photo) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
-            arrayOf(car.id, car.plate, car.engine, car.odometer, car.make, car.model, car.deliveryDate, car.customer, car.phone, car.worker, car.intake, car.status, created, now, car.photo)
+            arrayOf<Any?>(car.id, car.plate, car.engine, car.odometer, car.make, car.model, car.deliveryDate, car.customer, car.phone, car.worker, car.intake, car.status, created, now, car.photo)
         )
         db.execSQL("DELETE FROM parts WHERE carId=?", arrayOf(car.id))
         for (p in car.parts) if (p.isNotBlank()) db.execSQL("INSERT INTO parts(carId,name) VALUES(?,?)", arrayOf(car.id, p.trim()))
@@ -156,7 +156,7 @@ class Store(private val ctx: Context) {
         val cdb = openCentral()
         cdb.execSQL(
             "INSERT OR REPLACE INTO car_index(id,plate,customer,phone,make,status,month,created,updated,pay,photo) VALUES(?,?,?,?,?,?,?,?,?,?,?)",
-            arrayOf(car.id, car.plate, car.customer, car.phone, car.make, car.status, mk, created, now, pay, car.photo)
+            arrayOf<Any?>(car.id, car.plate, car.customer, car.phone, car.make, car.status, mk, created, now, pay, car.photo)
         )
         cdb.close()
         return car.copy(monthKey = mk, createdAt = created, updatedAt = now)
@@ -234,20 +234,20 @@ class Store(private val ctx: Context) {
     fun addPayment(car: Car, amount: Double, stage: String, userName: String) {
         val db = openMonth(car.monthKey)
         db.execSQL("INSERT INTO payments(carId,amount,stage,uid,uname,ts) VALUES(?,?,?,?,?,?)",
-            arrayOf(car.id, amount, stage, activeUserId, userName, System.currentTimeMillis()))
+            arrayOf<Any?>(car.id, amount, stage, activeUserId, userName, System.currentTimeMillis()))
         db.close()
         val pay = totalPaid(car.monthKey, car.id)
         val cdb = openCentral()
-        cdb.execSQL("UPDATE car_index SET pay=?, updated=? WHERE id=?", arrayOf(pay, System.currentTimeMillis(), car.id))
+        cdb.execSQL("UPDATE car_index SET pay=?, updated=? WHERE id=?", arrayOf<Any?>(pay, System.currentTimeMillis(), car.id))
         cdb.close()
     }
 
     fun setStatus(car: Car, status: String) {
         val db = openMonth(car.monthKey)
-        db.execSQL("UPDATE cars SET status=?, updated=? WHERE id=?", arrayOf(status, System.currentTimeMillis(), car.id))
+        db.execSQL("UPDATE cars SET status=?, updated=? WHERE id=?", arrayOf<Any?>(status, System.currentTimeMillis(), car.id))
         db.close()
         val cdb = openCentral()
-        cdb.execSQL("UPDATE car_index SET status=?, updated=? WHERE id=?", arrayOf(status, System.currentTimeMillis(), car.id))
+        cdb.execSQL("UPDATE car_index SET status=?, updated=? WHERE id=?", arrayOf<Any?>(status, System.currentTimeMillis(), car.id))
         cdb.close()
     }
 

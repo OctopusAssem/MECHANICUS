@@ -71,7 +71,7 @@ object GDrive {
             try {
                 val f = SimpleDateFormat(p, Locale.US)
                 f.timeZone = TimeZone.getTimeZone("UTC")
-                return f.parse(s)!!.timeInMillis
+                return f.parse(s)!!.time
             } catch (_: Exception) {}
         }
         return 0L

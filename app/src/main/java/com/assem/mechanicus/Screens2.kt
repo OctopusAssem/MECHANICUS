@@ -261,7 +261,6 @@ fun SettingsScreen(ctx: AppCtx) {
     var email by remember { mutableStateOf(ctx.store.driveEmail) }
     var sizeText by remember { mutableStateOf(humanSize(ctx.store.totalSize())) }
     var newPin by remember { mutableStateOf("") }
-    var ownerName by remember { mutableStateOf(ctx.store.ownerName) }
 
     val importLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) {
@@ -364,21 +363,20 @@ fun SettingsScreen(ctx: AppCtx) {
             }
         }
 
-        SectionTitle(L.s("صلاحية الحذف", "Delete permission"))
+        SectionTitle(L.s("مشاركة البرنامج", "Share the app"))
         CardBox {
             Text(
-                L.s("المدير المالك بس هو اللي يقدر يحذف عربية نهائيًا. أي مستخدم تاني يقدر يعدّل، ولما يحذف بتتشال من جهازه بس وبتفضل على جوجل.", "Only the owner can delete a car permanently. Any other user can edit; when they delete, the car is removed from their phone only and stays on Google."),
+                L.s("ابعت البرنامج نفسه كـ APK أو كملف مضغوط ZIP على واتساب أو أي حاجة، عشان يتسطّب على جهاز جديد.", "Send the app itself as an APK or a ZIP to WhatsApp or anywhere, so it can be installed on a new phone."),
                 color = Muted, fontSize = 11.5.sp, modifier = Modifier.padding(bottom = 8.dp),
             )
-            Field(L.s("اسم المدير المالك", "Owner name"), ownerName, { ownerName = it })
-            Spacer(Modifier.height(8.dp))
-            PrimaryButton(L.s("حفظ اسم المالك", "Save owner")) {
-                if (ownerName.isBlank()) Toast.makeText(context, L.s("اكتب الاسم", "Enter a name"), Toast.LENGTH_SHORT).show()
-                else {
-                    ctx.store.ownerName = ownerName
-                    ctx.store.addLog(ctx.store.activeUserName, "user", "", L.s("تغيير المالك", "Changed owner"))
-                    Toast.makeText(context, L.s("تم الحفظ ✅", "Saved ✅"), Toast.LENGTH_SHORT).show()
-                    ctx.bump()
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                PrimaryButton(L.s("مشاركة APK", "Share APK"), Modifier.weight(1f)) {
+                    try { AppShare.shareApk(context, L.s("تطبيق MECHANICUS", "MECHANICUS app")) }
+                    catch (e: Exception) { Toast.makeText(context, L.s("تعذر المشاركة", "Share failed"), Toast.LENGTH_SHORT).show() }
+                }
+                GhostButton(L.s("مشاركة ZIP", "Share ZIP"), Modifier.weight(1f)) {
+                    try { AppShare.shareZip(context, L.s("تطبيق MECHANICUS", "MECHANICUS app")) }
+                    catch (e: Exception) { Toast.makeText(context, L.s("تعذر المشاركة", "Share failed"), Toast.LENGTH_SHORT).show() }
                 }
             }
         }

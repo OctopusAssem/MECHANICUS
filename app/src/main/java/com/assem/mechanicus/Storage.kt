@@ -169,3 +169,39 @@ object Backup {
         return n
     }
 }
+
+// Share the app installer itself so it can be installed on a new phone.
+object AppShare {
+    private fun apk(ctx: Context): File {
+        val src = File(ctx.applicationInfo.sourceDir)
+        val out = File(ctx.cacheDir, "MECHANICUS-${appVersion(ctx)}.apk")
+        if (!out.exists() || out.length() != src.length()) src.copyTo(out, overwrite = true)
+        return out
+    }
+
+    fun shareApk(ctx: Context, subject: String) = send(ctx, apk(ctx), "application/vnd.android.package-archive", subject)
+
+    fun shareZip(ctx: Context, subject: String) {
+        val a = apk(ctx)
+        val zip = File(ctx.cacheDir, "MECHANICUS-${appVersion(ctx)}.zip")
+        ZipOutputStream(zip.outputStream()).use { zos ->
+            zos.putNextEntry(ZipEntry(a.name))
+            a.inputStream().use { it.copyTo(zos) }
+            zos.closeEntry()
+        }
+        send(ctx, zip, "application/zip", subject)
+    }
+
+    private fun send(ctx: Context, file: File, mime: String, subject: String) {
+        val uri = FileProvider.getUriForFile(ctx, ctx.packageName + ".fileprovider", file)
+        val send = Intent(Intent.ACTION_SEND).apply {
+            type = mime
+            putExtra(Intent.EXTRA_STREAM, uri)
+            putExtra(Intent.EXTRA_SUBJECT, subject)
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+        val chooser = Intent.createChooser(send, subject)
+        chooser.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        ctx.startActivity(chooser)
+    }
+}

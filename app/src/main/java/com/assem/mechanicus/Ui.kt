@@ -31,6 +31,7 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -75,14 +76,15 @@ val LightScheme = lightColorScheme(
 val DarkScheme = darkColorScheme(
     primary = Color(0xFFF43F5E),
     onPrimary = Color.White,
-    secondary = Red,
-    background = Color(0xFF0B1020),
-    onBackground = Color(0xFFE8ECF7),
-    surface = Color(0xFF151A2E),
-    onSurface = Color(0xFFE8ECF7),
-    surfaceVariant = Color(0xFF1E2438),
-    onSurfaceVariant = Color(0xFF97A1BD),
-    outline = Color(0xFF2A3350),
+    secondary = Color(0xFFDC2626),
+    onSecondary = Color.White,
+    background = Color(0xFF0A0507),
+    onBackground = Color(0xFFF5ECEC),
+    surface = Color(0xFF190A0E),
+    onSurface = Color(0xFFF7EFF0),
+    surfaceVariant = Color(0xFF2A1015),
+    onSurfaceVariant = Color(0xFFC9A2A6),
+    outline = Color(0xFF4A2027),
 )
 
 @Composable
@@ -97,7 +99,8 @@ fun CardBox(modifier: Modifier = Modifier, content: @Composable () -> Unit) {
         shape = RoundedCornerShape(18.dp),
         color = MaterialTheme.colorScheme.surface,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
-        tonalElevation = 0.dp,
+        tonalElevation = 3.dp,
+        shadowElevation = 6.dp,
     ) {
         Column(Modifier.padding(14.dp)) { content() }
     }
@@ -235,7 +238,7 @@ fun ReadOnlyField(label: String, value: String, modifier: Modifier = Modifier) {
 fun PrimaryButton(text: String, modifier: Modifier = Modifier, onClick: () -> Unit) {
     Button(
         onClick = onClick,
-        modifier = modifier.fillMaxWidth().height(52.dp),
+        modifier = modifier.fillMaxWidth().height(52.dp).shadow(7.dp, RoundedCornerShape(15.dp)),
         shape = RoundedCornerShape(15.dp),
         colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
     ) {
@@ -249,6 +252,7 @@ fun GhostButton(text: String, modifier: Modifier = Modifier, onClick: () -> Unit
         shape = RoundedCornerShape(15.dp),
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
         color = MaterialTheme.colorScheme.surface,
+        shadowElevation = 6.dp,
         modifier = modifier.height(52.dp).clickable { onClick() },
     ) {
         Box(contentAlignment = Alignment.Center) {
@@ -305,6 +309,7 @@ fun StatCard(emoji: String, number: String, label: String, tint: Color, soft: Co
         shape = RoundedCornerShape(16.dp),
         color = MaterialTheme.colorScheme.surface,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+        shadowElevation = 5.dp,
     ) {
         Column(Modifier.padding(13.dp)) {
             Box(

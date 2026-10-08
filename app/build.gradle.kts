@@ -11,8 +11,8 @@ android {
         applicationId = "com.assem.mechanicus"
         minSdk = 26
         targetSdk = 37
-        versionCode = 1
-        versionName = "0.1.0"
+        versionCode = 2
+        versionName = "0.2.0"
         vectorDrawables { useSupportLibrary = true }
     }
 
@@ -59,4 +59,5 @@ dependencies {
     implementation("androidx.compose.ui:ui-graphics")
     implementation("androidx.compose.material3:material3")
     implementation("androidx.compose.material:material-icons-extended")
+    implementation("com.google.android.gms:play-services-auth:21.2.0")
 }

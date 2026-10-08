@@ -107,7 +107,8 @@ fun HomeScreen(ctx: AppCtx) {
     val L = ctx.L
     val stats = remember(ctx.version) { ctx.store.stats() }
     val recent = remember(ctx.version) { ctx.store.listCars("all", "").take(4) }
-    val hour = remember { java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY) }
+    val context = LocalContext.current
+    var showSummary by remember { mutableStateOf(false) }
 
     LazyColumn(Modifier.fillMaxSize().padding(horizontal = 16.dp), contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = 20.dp)) {
         item {
@@ -138,8 +139,34 @@ fun HomeScreen(ctx: AppCtx) {
                 }
             }
         }
-        item { SectionTitle(L.s("ملخص اليوم", "Today's summary")) }
+        item { SectionTitle(L.s("إجراءات سريعة", "Quick actions")) }
         item {
+            Row(horizontalArrangement = Arrangement.spacedBy(11.dp)) {
+                QuickAction("🚗", L.s("إضافة عربية", "Add car"), Modifier.weight(1f)) { ctx.go(Dest.Edit(null)) }
+                QuickAction("💰", L.s("تسجيل دفعة", "Record payment"), Modifier.weight(1f)) { ctx.go(Dest.Payments) }
+                QuickAction("📤", L.s("إرسال جلسة اليوم", "Send today"), Modifier.weight(1f)) {
+                    Report.share(context, Report.today(ctx.store, L.isAr), L.s("تقرير جلسة اليوم", "Today session report"))
+                }
+            }
+        }
+        item {
+            Spacer(Modifier.height(11.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(11.dp)) {
+                QuickAction("🔍", L.s("بحث عن عميل", "Find customer"), Modifier.weight(1f)) { ctx.go(Dest.Cars) }
+                QuickAction("📜", L.s("السجل", "Log"), Modifier.weight(1f)) { ctx.go(Dest.Logs) }
+                QuickAction("☁️", L.s("صلاحيات درايف", "Drive"), Modifier.weight(1f)) { ctx.go(Dest.Sync) }
+            }
+        }
+        item {
+            Row(
+                Modifier.fillMaxWidth().clickable { showSummary = !showSummary }.padding(top = 18.dp, bottom = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(L.s("ملخص اليوم (الأرقام)", "Today's summary (numbers)"), fontSize = 15.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                Text(if (showSummary) "▾" else "▸", fontSize = 18.sp, color = Muted)
+            }
+        }
+        if (showSummary) item {
             Column(verticalArrangement = Arrangement.spacedBy(11.dp)) {
                 Row(horizontalArrangement = Arrangement.spacedBy(11.dp)) {
                     StatCard("🚗", stats.carsToday.toString(), L.s("عربيات النهاردة", "Cars today"), Red, RedSoft, Modifier.weight(1f))
@@ -149,14 +176,6 @@ fun HomeScreen(ctx: AppCtx) {
                     StatCard("💵", money(stats.todayIncome), L.s("تحصيل اليوم", "Today's income"), Green, GreenSoft, Modifier.weight(1f))
                     StatCard("📅", money(stats.monthIncome), L.s("إجمالي الشهر", "This month"), Blue, BlueSoft, Modifier.weight(1f))
                 }
-            }
-        }
-        item { SectionTitle(L.s("إجراءات سريعة", "Quick actions")) }
-        item {
-            Row(horizontalArrangement = Arrangement.spacedBy(11.dp)) {
-                QuickAction("🚗", L.s("إضافة عربية", "Add car"), Modifier.weight(1f)) { ctx.go(Dest.Edit(null)) }
-                QuickAction("💰", L.s("تسجيل دفعة", "Record payment"), Modifier.weight(1f)) { ctx.go(Dest.Payments) }
-                QuickAction("📜", L.s("السجل", "Log"), Modifier.weight(1f)) { ctx.go(Dest.Logs) }
             }
         }
         item { SectionTitle(L.s("أحدث العربيات", "Recent cars")) }

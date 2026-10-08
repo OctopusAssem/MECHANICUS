@@ -37,6 +37,14 @@ class Store(private val ctx: Context) {
         get() = prefs.getString("uname", "")!!
         set(v) = prefs.edit().putString("uname", v).apply()
 
+    var driveConnected: Boolean
+        get() = prefs.getBoolean("drive_connected", false)
+        set(v) = prefs.edit().putBoolean("drive_connected", v).apply()
+
+    var lastSync: Long
+        get() = prefs.getLong("last_sync", 0L)
+        set(v) = prefs.edit().putLong("last_sync", v).apply()
+
     fun root(): File {
         val base = if (useExternal) (ctx.getExternalFilesDir(null) ?: ctx.filesDir) else ctx.filesDir
         val r = File(base, "MECHANICUS")

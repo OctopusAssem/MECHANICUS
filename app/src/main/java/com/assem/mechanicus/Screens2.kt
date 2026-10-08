@@ -1,6 +1,14 @@
 package com.assem.mechanicus
 
 import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import com.google.android.gms.auth.api.signin.GoogleSignIn
+import com.google.android.gms.common.api.ApiException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -282,8 +290,13 @@ fun SettingsScreen(ctx: AppCtx) {
                 Switch(checked = dark, onCheckedChange = { dark = it; ctx.setDark(it) })
             }
             Row(Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                Text(L.s("حساب جوجل درايف", "Google Drive account"), fontWeight = FontWeight.Bold, fontSize = 14.sp, modifier = Modifier.weight(1f))
-                Text(L.s("متصل", "Connected"), color = Green, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                Text(L.s("صلاحيات ومزامنة جوجل", "Google permissions & sync"), fontWeight = FontWeight.Bold, fontSize = 14.sp, modifier = Modifier.weight(1f))
+                Text(
+                    if (ctx.store.driveConnected) L.s("متصل", "Connected") else L.s("غير مرتبط", "Not linked"),
+                    color = if (ctx.store.driveConnected) Green else Color(0xFFB45309),
+                    fontWeight = FontWeight.Bold, fontSize = 13.sp,
+                    modifier = Modifier.clickable { ctx.go(Dest.Sync) },
+                )
             }
             OutlinedTextField(
                 value = email, onValueChange = { email = it; ctx.store.driveEmail = it },
@@ -358,49 +371,138 @@ fun humanSize(bytes: Long): String = when {
     else -> "$bytes B"
 }
 
-// ------------------------- SYNC -------------------------
+// ------------------------- SYNC / GOOGLE -------------------------
 @Composable
 fun SyncScreen(ctx: AppCtx) {
     val L = ctx.L
     val context = LocalContext.current
-    var lastSync by remember { mutableStateOf(L.s("لم تتم بعد", "Not yet")) }
-    val files = remember(ctx.version) { ctx.store.dbFiles() }
+    val scope = rememberCoroutineScope()
+    val store = ctx.store
+    var account by remember(ctx.version) { mutableStateOf(GDrive.account(context)) }
+    var busy by remember { mutableStateOf(false) }
+    var status by remember { mutableStateOf("") }
+    val files = remember(ctx.version) { store.dbFiles() }
+    val lastFmt = remember { SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.US) }
+    val lastSync = if (store.lastSync > 0) lastFmt.format(Date(store.lastSync)) else L.s("لم تتم بعد", "Not yet")
+
+    val launcher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { res ->
+        try {
+            val acc = GoogleSignIn.getSignedInAccountFromIntent(res.data).getResult(ApiException::class.java)
+            account = acc
+            store.driveConnected = true
+            acc.email?.let { store.driveEmail = it }
+            status = L.s("تم ربط حساب جوجل ومنح صلاحية درايف ✅", "Google account linked and Drive permission granted ✅")
+            ctx.bump()
+        } catch (e: Exception) {
+            val code = (e as? ApiException)?.statusCode
+            status = L.s("فشل تسجيل الدخول", "Sign-in failed") + (if (code != null) " (code $code)" else "") +
+                (if (code == 10) L.s(" — لازم تسجّل بيانات التطبيق في Google Cloud (موجودة تحت).", " — register the app fingerprint in Google Cloud (below).") else "")
+        }
+    }
 
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp)) {
-        ScreenBar(title = L.s("المزامنة", "Sync"), onBack = { ctx.go(Dest.Settings) })
+        ScreenBar(title = L.s("صلاحيات ومزامنة جوجل", "Google sync & permissions"), onBack = { ctx.go(Dest.Settings) })
 
         CardBox {
             Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
                 Text("☁️", fontSize = 40.sp)
-                Text(ctx.store.driveEmail, fontWeight = FontWeight.Bold, fontSize = 15.sp)
-                Text(L.s("حساب جوجل درايف المرتبط", "Linked Google Drive account"), color = Muted, fontSize = 12.sp)
-                Spacer(Modifier.height(8.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    StatusChipPill("✅ " + L.s("مزامنة تلقائية", "Auto-sync"), GreenSoft, Green)
-                    StatusChipPill(L.s("آخر مزامنة: ", "Last sync: ") + lastSync, BlueSoft, Blue)
+                Text(account?.email ?: store.driveEmail, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                Text(
+                    if (account != null) L.s("الحساب مرتبط بصلاحية Google Drive", "Account linked with Google Drive permission")
+                    else L.s("غير مرتبط — اضغط لربط الحساب وطلب الصلاحية", "Not linked — tap to connect and grant permission"),
+                    color = Muted, fontSize = 12.sp, textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                )
+                Spacer(Modifier.height(10.dp))
+                if (account == null) {
+                    PrimaryButton(if (busy) L.s("جاري...", "Working...") else L.s("ربط حساب جوجل وطلب صلاحية درايف", "Connect Google & grant Drive")) {
+                        try { launcher.launch(GDrive.client(context).signInIntent) } catch (e: Exception) { status = e.message ?: "error" }
+                    }
+                } else {
+                    PrimaryButton(if (busy) L.s("جاري المزامنة...", "Syncing...") else L.s("مزامنة الآن", "Sync now")) {
+                        if (!busy) {
+                            busy = true
+                            status = L.s("جاري المزامنة مع درايف...", "Syncing with Drive...")
+                            scope.launch {
+                                val acc = account
+                                val res = withContext(Dispatchers.IO) {
+                                    try {
+                                        val tok = acc?.let { GDrive.token(context, it) }
+                                            ?: return@withContext SyncResult(0, 0, L.s("مش قادر أجيب صلاحية الوصول", "Could not get access token"))
+                                        GDrive.sync(context, tok, store)
+                                    } catch (e: Exception) {
+                                        SyncResult(0, 0, e.message ?: "error")
+                                    }
+                                }
+                                busy = false
+                                status = if (res.error.isBlank())
+                                    L.s("تمت المزامنة ✅ — رُفع ${res.uploaded} / نُزّل ${res.downloaded}", "Synced ✅ — uploaded ${res.uploaded} / downloaded ${res.downloaded}")
+                                else L.s("خطأ: ", "Error: ") + res.error
+                                ctx.bump()
+                            }
+                        }
+                    }
                 }
+                Spacer(Modifier.height(8.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    StatusChipPill("✅ " + L.s("آخر مزامنة: ", "Last sync: ") + lastSync, BlueSoft, Blue)
+                    StatusChipPill((if (store.driveConnected) "✅ " else "⚪ ") + L.s("درايف", "Drive"), if (store.driveConnected) GreenSoft else AmberSoft, if (store.driveConnected) Green else Color(0xFFB45309))
+                }
+                if (status.isNotBlank()) Text(status, color = MaterialTheme.colorScheme.primary, fontSize = 12.sp, modifier = Modifier.padding(top = 8.dp), textAlign = androidx.compose.ui.text.style.TextAlign.Center)
             }
         }
 
+        SectionTitle(L.s("إرسال جلسة اليوم (بلوتوث / مشاركة)", "Send today's session (Bluetooth / share)"))
         CardBox {
-            InfoRow(L.s("تغييرات محلية للرفع", "Local changes"), "—")
-            InfoRow(L.s("تغييرات جديدة من جهاز تاني", "New from another device"), "—")
-            InfoRow(L.s("تعارضات", "Conflicts"), "0")
+            Text(L.s("يجهّز تقرير بكل عربيات ودفعات اليوم، وبعدها تختار البلوتوث من قائمة المشاركة.", "Builds a report of today's cars and payments; pick Bluetooth from the share sheet."), color = Muted, fontSize = 12.sp)
             Spacer(Modifier.height(10.dp))
-            PrimaryButton(L.s("مزامنة الآن", "Sync now")) {
-                lastSync = L.s("الآن", "just now")
-                Toast.makeText(context, L.s("المزامنة الحقيقية مع درايف تحتاج تسجيل صلاحية جوجل (الخطوة الجاية).", "Real Drive sync needs Google sign-in setup (next step)."), Toast.LENGTH_LONG).show()
+            PrimaryButton(L.s("إرسال جلسة اليوم", "Send today's session")) {
+                Report.share(context, Report.today(store, L.isAr), L.s("تقرير جلسة اليوم", "Today session report"))
+            }
+        }
+
+        SectionTitle(L.s("بيانات لازمة لتفعيل صلاحية جوجل", "Data needed to enable Google permission"))
+        CardBox {
+            Text(L.s("لو ظهر خطأ رقم 10، دي بيانات التطبيق اللي تتسجّل في Google Cloud:", "If error 10 appears, register this app data in Google Cloud:"), color = Muted, fontSize = 12.sp)
+            InfoRow(L.s("اسم الحزمة", "Package name"), GDrive.PKG)
+            Text("SHA-1: " + GDrive.SHA1, fontSize = 11.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 6.dp))
+            Spacer(Modifier.height(8.dp))
+            PillLink(L.s("نسخ بيانات التسجيل", "Copy registration data")) {
+                val clip = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                clip.setPrimaryClip(android.content.ClipData.newPlainText("info", "package=${GDrive.PKG}\nsha1=${GDrive.SHA1}\nscope=${GDrive.SCOPE}"))
+                Toast.makeText(context, L.s("تم النسخ", "Copied"), Toast.LENGTH_SHORT).show()
             }
         }
 
         SectionTitle(L.s("ملفات قاعدة البيانات (مقسّمة شهريًا)", "Database files (monthly shards)"))
         CardBox {
-            Text(ctx.store.root().name + "/", fontWeight = FontWeight.Black, fontSize = 13.sp)
-            Text("index/db central: app.db", color = Muted, fontSize = 12.sp)
-            for (f in files) Text("data/" + f.name + "  (" + humanSize(f.length()) + ")", fontSize = 12.sp)
-            Text(L.s("الصور محفوظة في مجلد photos، خارج قاعدة البيانات لتبقى خفيفة.", "Photos live in the photos folder, outside the DB, to keep it light."), color = Muted, fontSize = 11.sp, modifier = Modifier.padding(top = 8.dp))
+            Text(store.root().name + "/ (" + L.s("مجلد على الجهاز", "on-device folder") + ")", fontWeight = FontWeight.Black, fontSize = 13.sp)
+            for (f in files) Text(f.name + "  (" + humanSize(f.length()) + ")", fontSize = 12.sp)
+            Text(L.s("المزامنة ترفع/تنزّل الملفات المتغيّرة فقط وتدمج حسب وقت التعديل.", "Sync uploads/downloads only changed files and merges by modified time."), color = Muted, fontSize = 11.sp, modifier = Modifier.padding(top = 8.dp))
         }
-        Spacer(Modifier.height(26.dp))
+
+        if (account != null) {
+            Spacer(Modifier.height(10.dp))
+            PillLink(L.s("فصل الحساب (تسجيل خروج درايف)", "Disconnect Google account")) {
+                GDrive.signOut(context)
+                store.driveConnected = false
+                account = null
+                status = L.s("تم الفصل", "Disconnected")
+                ctx.bump()
+            }
+        }
+        Spacer(Modifier.height(30.dp))
+    }
+}
+
+@Composable
+fun PillLink(text: String, onClick: () -> Unit) {
+    Surface(
+        shape = RoundedCornerShape(13.dp),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+        color = MaterialTheme.colorScheme.surface,
+        modifier = Modifier.fillMaxWidth().clickable { onClick() },
+    ) {
+        Text(text, textAlign = androidx.compose.ui.text.style.TextAlign.Center, fontWeight = FontWeight.Bold, fontSize = 13.sp, modifier = Modifier.padding(12.dp))
     }
 }
 

@@ -196,9 +196,19 @@ fun App(incoming: MutableState<Uri?>? = null) {
     val dir = if (lang == "ar") LayoutDirection.Rtl else LayoutDirection.Ltr
     CompositionLocalProvider(LocalLang provides L, LocalLayoutDirection provides dir) {
         MechanicusTheme(dark) {
-            Surface(color = MaterialTheme.colorScheme.background, modifier = Modifier.fillMaxSize()) {
-                Column(Modifier.fillMaxSize()) {
-                    Box(Modifier.weight(1f)) {
+            Box(
+                Modifier.fillMaxSize().background(
+                    Brush.verticalGradient(listOf(Color(0xFF3A0C12), Color(0xFF14060A), Color(0xFF060304)))
+                )
+            ) {
+                Box(
+                    Modifier.fillMaxWidth().height(420.dp).align(Alignment.TopCenter).background(
+                        Brush.radialGradient(listOf(Color(0x55DC2626), Color(0x00000000)))
+                    )
+                )
+                Surface(color = Color.Transparent, contentColor = MaterialTheme.colorScheme.onBackground, modifier = Modifier.fillMaxSize()) {
+                    Column(Modifier.fillMaxSize()) {
+                        Box(Modifier.weight(1f)) {
                         when (val d = dest) {
                             Dest.Splash -> SplashScreen(onLaunch = { dest = Dest.Login })
                             Dest.Login -> LoginScreen(ctx)
@@ -215,6 +225,7 @@ fun App(incoming: MutableState<Uri?>? = null) {
                     }
                     val showBar = dest == Dest.Home || dest == Dest.Cars || dest == Dest.Payments || dest == Dest.Settings
                     if (showBar) BottomBar(ctx, dest)
+                }
                 }
             }
             if (showExit) {
@@ -281,7 +292,7 @@ fun BottomBar(ctx: AppCtx, dest: Dest) {
 fun SplashScreen(onLaunch: () -> Unit) {
     val L = LocalLang.current
     LaunchedEffect(Unit) {
-        delay(1200)
+        delay(3000)
         onLaunch()
     }
     Box(

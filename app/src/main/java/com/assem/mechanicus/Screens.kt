@@ -89,7 +89,7 @@ fun PhotoThumb(path: String?, onClick: () -> Unit) {
                 path.isNullOrBlank() -> null
                 path.startsWith("content://") -> BitmapFactory.decodeStream(context.contentResolver.openInputStream(Uri.parse(path)))?.asImageBitmap()
                 else -> {
-                    val p = File(path)
+                    val p = if (path.contains("/")) File(path) else File(Store(context).photosDir(), path)
                     if (p.exists() && p.length() > 0) BitmapFactory.decodeFile(p.absolutePath)?.asImageBitmap() else null
                 }
             }
@@ -317,26 +317,24 @@ fun EditCarScreen(ctx: AppCtx, id: String?) {
     val camera = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { ok ->
         val f = pendingFile
         if (ok && f != null) {
-            val name = "MECHANICUS_plate_${System.currentTimeMillis()}.jpg"
-            val g = Gallery.saveFile(context, f, name)
-            photo = g ?: f.absolutePath
-            if (g != null) f.delete()
+            val name = PhotoStore.PREFIX + System.currentTimeMillis() + ".jpg"
+            val wm = PhotoStore.build(context, ctx.store, f, name)
+            f.delete()
+            if (wm != null) {
+                Gallery.saveFile(context, wm, wm.name)
+                photo = wm.name
+            }
         } else {
             f?.delete()
         }
     }
     val gallery = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
         if (uri != null) {
-            val name = "MECHANICUS_plate_${System.currentTimeMillis()}.jpg"
-            val g = Gallery.saveUri(context, uri, name)
-            if (g != null) {
-                photo = g
-            } else {
-                try {
-                    val f = File(ctx.store.photosDir(), name)
-                    context.contentResolver.openInputStream(uri)?.use { input -> f.outputStream().use { input.copyTo(it) } }
-                    photo = f.absolutePath
-                } catch (_: Exception) {}
+            val name = PhotoStore.PREFIX + System.currentTimeMillis() + ".jpg"
+            val wm = PhotoStore.buildUri(context, ctx.store, uri, name)
+            if (wm != null) {
+                Gallery.saveFile(context, wm, wm.name)
+                photo = wm.name
             }
         }
     }

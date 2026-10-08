@@ -262,6 +262,7 @@ fun SettingsScreen(ctx: AppCtx) {
     var email by remember { mutableStateOf(ctx.store.driveEmail) }
     var sizeText by remember { mutableStateOf(humanSize(ctx.store.totalSize())) }
     var newPin by remember { mutableStateOf("") }
+    var ownerName by remember { mutableStateOf(ctx.store.ownerName) }
 
     val importLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) {
@@ -323,10 +324,6 @@ fun SettingsScreen(ctx: AppCtx) {
                 }
             }
             Row(Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                Text(L.s("الوضع الليلي", "Dark mode"), fontWeight = FontWeight.Bold, fontSize = 14.sp, modifier = Modifier.weight(1f))
-                Switch(checked = dark, onCheckedChange = { dark = it; ctx.setDark(it) })
-            }
-            Row(Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                 Text(L.s("صلاحيات ومزامنة جوجل", "Google permissions & sync"), fontWeight = FontWeight.Bold, fontSize = 14.sp, modifier = Modifier.weight(1f))
                 Text(
                     if (ctx.store.driveConnected) L.s("متصل", "Connected") else L.s("غير مرتبط", "Not linked"),
@@ -360,6 +357,25 @@ fun SettingsScreen(ctx: AppCtx) {
                     Toast.makeText(context, L.s("تم تغيير الرقم السري ✅", "PIN changed ✅"), Toast.LENGTH_SHORT).show()
                 } else {
                     Toast.makeText(context, L.s("اكتب 4 أرقام", "Enter 4 digits"), Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
+
+        SectionTitle(L.s("صلاحية الحذف", "Delete permission"))
+        CardBox {
+            Text(
+                L.s("المدير المالك بس هو اللي يقدر يحذف عربية نهائيًا. أي مستخدم تاني يقدر يعدّل، ولما يحذف بتتشال من جهازه بس وبتفضل على جوجل.", "Only the owner can delete a car permanently. Any other user can edit; when they delete, the car is removed from their phone only and stays on Google."),
+                color = Muted, fontSize = 11.5.sp, modifier = Modifier.padding(bottom = 8.dp),
+            )
+            Field(L.s("اسم المدير المالك", "Owner name"), ownerName, { ownerName = it })
+            Spacer(Modifier.height(8.dp))
+            PrimaryButton(L.s("حفظ اسم المالك", "Save owner")) {
+                if (ownerName.isBlank()) Toast.makeText(context, L.s("اكتب الاسم", "Enter a name"), Toast.LENGTH_SHORT).show()
+                else {
+                    ctx.store.ownerName = ownerName
+                    ctx.store.addLog(ctx.store.activeUserName, "user", "", L.s("تغيير المالك", "Changed owner"))
+                    Toast.makeText(context, L.s("تم الحفظ ✅", "Saved ✅"), Toast.LENGTH_SHORT).show()
+                    ctx.bump()
                 }
             }
         }

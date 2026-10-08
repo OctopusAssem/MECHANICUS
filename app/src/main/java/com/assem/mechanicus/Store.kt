@@ -51,6 +51,11 @@ class Store(private val ctx: Context) {
         get() = prefs.getBoolean("sync_pending", false)
         set(v) = prefs.edit().putBoolean("sync_pending", v).apply()
 
+    // The owner is the only one allowed to really delete (on Drive too).
+    var ownerName: String
+        get() = prefs.getString("owner_name", "عاصم حسين")!!
+        set(v) = prefs.edit().putString("owner_name", v).apply()
+
     fun root(): File = rootFor(useExternal)
 
     fun rootFor(external: Boolean): File {
@@ -121,6 +126,7 @@ class Store(private val ctx: Context) {
         db.execSQL("CREATE TABLE IF NOT EXISTS car_index(id TEXT PRIMARY KEY, plate TEXT, customer TEXT, phone TEXT, make TEXT, status TEXT, month TEXT, created INTEGER, updated INTEGER, pay REAL, photo TEXT, adate TEXT)")
         try { db.execSQL("ALTER TABLE car_index ADD COLUMN adate TEXT") } catch (_: Exception) {}
         db.execSQL("CREATE TABLE IF NOT EXISTS tombstones(id TEXT PRIMARY KEY, updated INTEGER)")
+        db.execSQL("CREATE TABLE IF NOT EXISTS hidden(id TEXT PRIMARY KEY)")
         return db
     }
 
@@ -406,6 +412,55 @@ class Store(private val ctx: Context) {
         db.execSQL("DELETE FROM tombstones")
         for ((k, v) in map) if (k.isNotBlank()) db.execSQL("INSERT OR REPLACE INTO tombstones(id,updated) VALUES(?,?)", arrayOf<Any?>(k, v))
         db.close()
+    }
+
+    // ---------- owner & local hide ----------
+    // Only the owner (عاصم حسين) may delete for real (on Google too). Everyone
+    // else can only hide a car on their own phone; it stays on Drive.
+    fun isOwner(userName: String): Boolean {
+        val n = normName(userName)
+        if (n.isBlank()) return false
+        if (n == normName(ownerName)) return true
+        if (n == normName("عاصم حسين") || n == normName("Assem Hussein")) return true
+        return try { users().any { normName(it.name) == n && it.role == "owner" } } catch (_: Exception) { false }
+    }
+
+    private fun normName(s: String) = s.trim().replace("\\s+".toRegex(), " ").lowercase()
+
+    fun isActiveOwner(): Boolean = isOwner(activeUserName)
+
+    fun hiddenIds(): MutableSet<String> {
+        val db = openCentral()
+        val c = db.rawQuery("SELECT id FROM hidden", null)
+        val out = HashSet<String>()
+        while (c.moveToNext()) c.getString(0)?.let { out.add(it) }
+        c.close(); db.close()
+        return out
+    }
+
+    fun hideLocally(id: String) {
+        val db = openCentral()
+        db.execSQL("INSERT OR REPLACE INTO hidden(id) VALUES(?)", arrayOf<Any?>(id))
+        db.close()
+    }
+
+    fun unhide(id: String) {
+        val db = openCentral()
+        db.execSQL("DELETE FROM hidden WHERE id=?", arrayOf<Any?>(id))
+        db.close()
+    }
+
+    // Removes a car from this phone only (keeps it on Drive), for non-owners.
+    fun hideCar(car: Car) {
+        val db = openMonth(car.monthKey)
+        db.execSQL("DELETE FROM cars WHERE id=?", arrayOf(car.id))
+        db.execSQL("DELETE FROM parts WHERE carId=?", arrayOf(car.id))
+        db.execSQL("DELETE FROM payments WHERE carId=?", arrayOf(car.id))
+        db.close()
+        val cdb = openCentral()
+        cdb.execSQL("DELETE FROM car_index WHERE id=?", arrayOf(car.id))
+        cdb.execSQL("INSERT OR REPLACE INTO hidden(id) VALUES(?)", arrayOf<Any?>(car.id))
+        cdb.close()
     }
 
     fun upsertCarFull(car: Car) {

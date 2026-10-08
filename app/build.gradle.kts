@@ -11,11 +11,11 @@ android {
         applicationId = "com.assem.mechanicus"
         minSdk = 26
         targetSdk = 37
-        versionCode = 17
-        versionName = "0.13.0"
+        versionCode = 18
+        versionName = "0.14.0"
         vectorDrawables { useSupportLibrary = true }
-        val saJsonB64 = System.getenv("MECHANICUS_SA_B64") ?: ""
-        buildConfigField("String", "SA_JSON_B64", "\"$saJsonB64\"")
+        val syncBlob = System.getenv("MECHANICUS_SYNC_BLOB") ?: ""
+        buildConfigField("String", "SYNC_BLOB", "\"$syncBlob\"")
     }
 
     signingConfigs {

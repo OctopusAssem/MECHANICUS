@@ -168,8 +168,8 @@ fun App(incoming: MutableState<Uri?>? = null) {
     // carries the shop's service account, sync is on for everyone from the start
     // (no per-phone Google sign-in) and we also pull in that first sync.
     LaunchedEffect(Unit) {
-        if (ServiceAuth.isConfigured() && !store.driveConnected) store.driveConnected = true
-        if (store.driveConnected && (store.syncPending || ServiceAuth.isConfigured())) {
+        if (ServiceAuth.isConfigured(context) && !store.driveConnected) store.driveConnected = true
+        if (store.driveConnected && (store.syncPending || ServiceAuth.isConfigured(context))) {
             val r = withContext(Dispatchers.IO) { AutoSync.run(context, store) }
             if (r == AutoSync.SYNCED) version++
             if (r == AutoSync.SYNCED || r == AutoSync.LOCKED) locked = store.dbProtected && !store.dbAuthorized
@@ -327,34 +327,37 @@ fun LockScreen(ctx: AppCtx, onUnlock: () -> Unit) {
         Spacer(Modifier.height(8.dp))
         Text(
             L.s(
-                "الجهاز ده مش مصرّح. خلي المسؤول (عاصم حسين) يكتب باسورد المسؤول هنا مرة واحدة، فيفتح البرنامج ويسمح بالمزامنة.",
-                "This device isn't approved. Ask the admin (Assem Hussein) to enter the admin password once to open the app and allow sync.",
+                "الجهاز ده مش مفعّل. خلي المسؤول (عاصم حسين) يكتب مفتاح الشركة هنا مرة واحدة، فيتفعّل البرنامج وتشتغل المزامنة.",
+                "This device isn't activated. Ask the admin (Assem Hussein) to enter the company key once to activate the app and enable sync.",
             ),
             color = Muted, fontSize = 13.sp, textAlign = TextAlign.Center,
         )
         Spacer(Modifier.height(18.dp))
+        val needsKey = !ServiceAuth.isConfigured(context)
         CardBox {
             OutlinedTextField(
                 value = pass,
                 onValueChange = { pass = it; err = "" },
-                label = { Text(L.s("باسورد المسؤول", "Admin password"), fontSize = 12.sp) },
+                label = { Text(if (needsKey) L.s("مفتاح الشركة", "Company key") else L.s("باسورد المسؤول", "Admin password"), fontSize = 12.sp) },
                 singleLine = true,
                 visualTransformation = PasswordVisualTransformation(),
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
+                keyboardOptions = KeyboardOptions(keyboardType = if (needsKey) KeyboardType.Ascii else KeyboardType.NumberPassword),
                 shape = RoundedCornerShape(13.dp),
                 modifier = Modifier.fillMaxWidth(),
             )
             if (err.isNotEmpty()) Text(err, color = Red, fontSize = 12.sp, modifier = Modifier.padding(top = 6.dp))
             Spacer(Modifier.height(12.dp))
-            PrimaryButton(L.s("تصريح وفتح", "Approve & unlock")) {
-                if (ctx.store.verifyAdminPass(pass)) {
+            PrimaryButton(if (needsKey) L.s("تفعيل وتصريح", "Activate & approve") else L.s("تصريح وفتح", "Approve & unlock")) {
+                val activated = if (needsKey) ServiceAuth.provision(context, pass.trim()) else false
+                val ok = if (needsKey) activated else ctx.store.verifyAdminPass(pass)
+                if (ok) {
                     ctx.store.dbAuthorized = true
                     ctx.store.addLog("عاصم حسين", "user", "", L.s("تصريح جهاز وفتح البرنامج", "Approved device & unlocked app"))
                     ctx.bump()
-                    Toast.makeText(context, L.s("تم التصريح ✅", "Approved ✅"), Toast.LENGTH_SHORT).show()
+                    Toast.makeText(context, L.s("تم التفعيل ✅", "Activated ✅"), Toast.LENGTH_SHORT).show()
                     onUnlock()
                 } else {
-                    err = L.s("باسورد المسؤول غلط", "Wrong admin password")
+                    err = if (needsKey) L.s("مفتاح الشركة غلط", "Wrong company key") else L.s("باسورد المسؤول غلط", "Wrong admin password")
                 }
             }
         }

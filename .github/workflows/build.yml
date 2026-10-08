@@ -25,7 +25,7 @@ jobs:
 
       - name: Build release APK
         env:
-          MECHANICUS_SA_B64: ${{ secrets.MECHANICUS_SA_B64 }}
+          MECHANICUS_SYNC_BLOB: ${{ secrets.MECHANICUS_SYNC_BLOB }}
         run: gradle :app:assembleRelease --no-daemon --stacktrace
 
       - name: Show APK info

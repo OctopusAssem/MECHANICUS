@@ -749,6 +749,7 @@ fun SyncScreen(ctx: AppCtx) {
     val scope = rememberCoroutineScope()
     val store = ctx.store
     var account by remember(ctx.version) { mutableStateOf(GDrive.account(context)) }
+    val auto = ServiceAuth.isConfigured()
     var busy by remember { mutableStateOf(false) }
     var status by remember { mutableStateOf("") }
     val files = remember(ctx.version) { store.dbFiles() }
@@ -776,27 +777,25 @@ fun SyncScreen(ctx: AppCtx) {
         CardBox {
             Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
                 Text("☁️", fontSize = 40.sp)
-                Text(account?.email ?: store.driveEmail, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                Text(if (auto) ServiceAuth.email() else (account?.email ?: store.driveEmail), fontWeight = FontWeight.Bold, fontSize = 15.sp)
                 Text(
-                    if (account != null) L.s("الحساب مرتبط بصلاحية Google Drive", "Account linked with Google Drive permission")
-                    else L.s("غير مرتبط — اضغط لربط الحساب وطلب الصلاحية", "Not linked — tap to connect and grant permission"),
+                    when {
+                        auto -> L.s("متصل تلقائيًا بحساب الشركة — مش مطلوب تسجيل دخول جوجل على الموبايل", "Auto-connected to the company account — no Google sign-in needed on the phone")
+                        account != null -> L.s("الحساب مرتبط بصلاحية Google Drive", "Account linked with Google Drive permission")
+                        else -> L.s("غير مرتبط — اضغط لربط الحساب وطلب الصلاحية", "Not linked — tap to connect and grant permission")
+                    },
                     color = Muted, fontSize = 12.sp, textAlign = androidx.compose.ui.text.style.TextAlign.Center,
                 )
                 Spacer(Modifier.height(10.dp))
-                if (account == null) {
-                    PrimaryButton(if (busy) L.s("جاري...", "Working...") else L.s("ربط حساب جوجل وطلب صلاحية درايف", "Connect Google & grant Drive")) {
-                        try { launcher.launch(GDrive.client(context).signInIntent) } catch (e: Exception) { status = e.message ?: "error" }
-                    }
-                } else {
+                if (auto || account != null) {
                     PrimaryButton(if (busy) L.s("جاري المزامنة...", "Syncing...") else L.s("مزامنة الآن", "Sync now")) {
                         if (!busy) {
                             busy = true
                             status = L.s("جاري المزامنة مع درايف...", "Syncing with Drive...")
                             scope.launch {
-                                val acc = account
                                 val res = withContext(Dispatchers.IO) {
                                     try {
-                                        val tok = acc?.let { GDrive.token(context, it) }
+                                        val tok = GDrive.token(context)
                                             ?: return@withContext SyncResult(0, 0, L.s("مش قادر أجيب صلاحية الوصول", "Could not get access token"))
                                         SyncEngine.run(context, tok, store)
                                     } catch (e: Exception) {
@@ -812,6 +811,10 @@ fun SyncScreen(ctx: AppCtx) {
                                 ctx.bump()
                             }
                         }
+                    }
+                } else {
+                    PrimaryButton(if (busy) L.s("جاري...", "Working...") else L.s("ربط حساب جوجل وطلب صلاحية درايف", "Connect Google & grant Drive")) {
+                        try { launcher.launch(GDrive.client(context).signInIntent) } catch (e: Exception) { status = e.message ?: "error" }
                     }
                 }
                 Spacer(Modifier.height(8.dp))

@@ -261,6 +261,7 @@ fun SettingsScreen(ctx: AppCtx) {
     var dark by remember { mutableStateOf(ctx.store.dark) }
     var email by remember { mutableStateOf(ctx.store.driveEmail) }
     var sizeText by remember { mutableStateOf(humanSize(ctx.store.totalSize())) }
+    var newPin by remember { mutableStateOf("") }
 
     val importLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) {
@@ -319,6 +320,28 @@ fun SettingsScreen(ctx: AppCtx) {
                 label = { Text(L.s("إيميل الدرايف (قابل للتغيير)", "Drive email (editable)"), fontSize = 12.sp) },
                 singleLine = true, shape = RoundedCornerShape(13.dp), modifier = Modifier.fillMaxWidth(),
             )
+        }
+
+        SectionTitle(L.s("الأمان", "Security"))
+        CardBox {
+            Text(
+                L.s("غيّر الرقم السري بتاعك — المستخدم الحالي: ", "Change your PIN — current user: ") + ctx.store.activeUserName,
+                color = Muted, fontSize = 12.sp,
+            )
+            Spacer(Modifier.height(8.dp))
+            Field(L.s("رقم سري جديد (4 أرقام)", "New PIN (4 digits)"), newPin, { newPin = it }, keyboardType = KeyboardType.Number, digitsOnly = true, maxLen = 4)
+            Spacer(Modifier.height(8.dp))
+            PrimaryButton(L.s("حفظ الرقم السري", "Save PIN")) {
+                if (newPin.length == 4 && ctx.store.activeUserId > 0) {
+                    ctx.store.setPin(ctx.store.activeUserId, newPin)
+                    ctx.store.addLog(ctx.store.activeUserName, "user", "", L.s("تغيير الرقم السري", "Changed PIN"))
+                    newPin = ""
+                    ctx.requestSync()
+                    Toast.makeText(context, L.s("تم تغيير الرقم السري ✅", "PIN changed ✅"), Toast.LENGTH_SHORT).show()
+                } else {
+                    Toast.makeText(context, L.s("اكتب 4 أرقام", "Enter 4 digits"), Toast.LENGTH_SHORT).show()
+                }
+            }
         }
 
         SectionTitle(L.s("السرعة وتنظيف البيانات", "Speed & cleanup"))

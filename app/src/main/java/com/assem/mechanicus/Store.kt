@@ -45,6 +45,11 @@ class Store(private val ctx: Context) {
         get() = prefs.getLong("last_sync", 0L)
         set(v) = prefs.edit().putLong("last_sync", v).apply()
 
+    // True when local data changed and still needs to reach Drive.
+    var syncPending: Boolean
+        get() = prefs.getBoolean("sync_pending", false)
+        set(v) = prefs.edit().putBoolean("sync_pending", v).apply()
+
     fun root(): File {
         val base = if (useExternal) (ctx.getExternalFilesDir(null) ?: ctx.filesDir) else ctx.filesDir
         val r = File(base, "MECHANICUS")
@@ -72,14 +77,6 @@ class Store(private val ctx: Context) {
         db.execSQL("CREATE TABLE IF NOT EXISTS logs(id INTEGER PRIMARY KEY AUTOINCREMENT, ts INTEGER, uname TEXT, action TEXT, plate TEXT, detail TEXT)")
         db.execSQL("CREATE TABLE IF NOT EXISTS car_index(id TEXT PRIMARY KEY, plate TEXT, customer TEXT, phone TEXT, make TEXT, status TEXT, month TEXT, created INTEGER, updated INTEGER, pay REAL, photo TEXT, adate TEXT)")
         try { db.execSQL("ALTER TABLE car_index ADD COLUMN adate TEXT") } catch (_: Exception) {}
-        val c = db.rawQuery("SELECT COUNT(*) FROM users", null)
-        val n = if (c.moveToFirst()) c.getInt(0) else 0
-        c.close()
-        if (n == 0) {
-            db.execSQL("INSERT INTO users(name,pin,role,active) VALUES('عاصم حسين','1234','admin',1)")
-            db.execSQL("INSERT INTO users(name,pin,role,active) VALUES('محمد السيد','1111','tech',1)")
-            db.execSQL("INSERT INTO users(name,pin,role,active) VALUES('كريم فتحي','2222','tech',1)")
-        }
         return db
     }
 
@@ -112,6 +109,12 @@ class Store(private val ctx: Context) {
     fun addUser(name: String, pin: String, role: String) {
         val db = openCentral()
         db.execSQL("INSERT INTO users(name,pin,role,active) VALUES(?,?,?,1)", arrayOf(name, pin, role))
+        db.close()
+    }
+
+    fun setPin(id: Long, pin: String) {
+        val db = openCentral()
+        db.execSQL("UPDATE users SET pin=? WHERE id=?", arrayOf(pin, id))
         db.close()
     }
 
@@ -168,6 +171,7 @@ class Store(private val ctx: Context) {
             arrayOf<Any?>(car.id, car.plate, car.customer, car.phone, car.make, car.status, mk, created, now, pay, car.photo, car.deliveryDate)
         )
         cdb.close()
+        syncPending = true
         return car.copy(monthKey = mk, createdAt = created, updatedAt = now)
     }
 
@@ -250,6 +254,7 @@ class Store(private val ctx: Context) {
         val cdb = openCentral()
         cdb.execSQL("UPDATE car_index SET pay=?, updated=? WHERE id=?", arrayOf<Any?>(pay, System.currentTimeMillis(), car.id))
         cdb.close()
+        syncPending = true
     }
 
     fun setStatus(car: Car, status: String) {
@@ -259,6 +264,7 @@ class Store(private val ctx: Context) {
         val cdb = openCentral()
         cdb.execSQL("UPDATE car_index SET status=?, updated=? WHERE id=?", arrayOf<Any?>(status, System.currentTimeMillis(), car.id))
         cdb.close()
+        syncPending = true
     }
 
     fun deleteCar(car: Car) {
@@ -270,6 +276,7 @@ class Store(private val ctx: Context) {
         val cdb = openCentral()
         cdb.execSQL("DELETE FROM car_index WHERE id=?", arrayOf(car.id))
         cdb.close()
+        syncPending = true
     }
 
     fun recentPayments(limit: Int = 20): List<PayRow> {

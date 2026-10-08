@@ -2,6 +2,7 @@ package com.assem.mechanicus
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -213,6 +214,20 @@ fun PrimaryButton(text: String, modifier: Modifier = Modifier, onClick: () -> Un
         colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
     ) {
         Text(text, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+    }
+}
+
+@Composable
+fun GhostButton(text: String, modifier: Modifier = Modifier, onClick: () -> Unit) {
+    Surface(
+        shape = RoundedCornerShape(15.dp),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+        color = MaterialTheme.colorScheme.surface,
+        modifier = modifier.height(52.dp).clickable { onClick() },
+    ) {
+        Box(contentAlignment = Alignment.Center) {
+            Text(text, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+        }
     }
 }
 

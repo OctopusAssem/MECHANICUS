@@ -228,6 +228,7 @@ object SyncEngine {
 
     private fun applyMerged(store: Store, merged: JSONObject, local: Snap) {
         val arr = merged.optJSONArray("cars") ?: return
+        val hidden = store.hiddenIds()
         for (i in 0 until arr.length()) {
             val o = arr.getJSONObject(i)
             val id = o.optString("id")
@@ -236,8 +237,10 @@ object SyncEngine {
                 val month = local.cars[id]?.optString("month").orEmpty()
                     .ifBlank { store.monthKey(System.currentTimeMillis()) }
                 store.removeCarLocal(id, month)
+                store.unhide(id)
                 continue
             }
+            if (hidden.contains(id)) continue // stays hidden on this phone, alive on Drive
             store.upsertCarFull(carFromJson(o))
         }
         val tombs = HashMap<String, Long>()

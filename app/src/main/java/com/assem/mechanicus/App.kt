@@ -164,9 +164,12 @@ fun App(incoming: MutableState<Uri?>? = null) {
         incoming?.value = null
     }
 
-    // Flush any pending (made-offline) changes to Drive on launch.
+    // Flush any pending (made-offline) changes to Drive on launch. When the app
+    // carries the shop's service account, sync is on for everyone from the start
+    // (no per-phone Google sign-in) and we also pull in that first sync.
     LaunchedEffect(Unit) {
-        if (store.syncPending && store.driveConnected) {
+        if (ServiceAuth.isConfigured() && !store.driveConnected) store.driveConnected = true
+        if (store.driveConnected && (store.syncPending || ServiceAuth.isConfigured())) {
             val r = withContext(Dispatchers.IO) { AutoSync.run(context, store) }
             if (r == AutoSync.SYNCED) version++
             if (r == AutoSync.SYNCED || r == AutoSync.LOCKED) locked = store.dbProtected && !store.dbAuthorized
@@ -220,7 +223,7 @@ fun App(incoming: MutableState<Uri?>? = null) {
                     Column(Modifier.fillMaxSize()) {
                         Box(Modifier.weight(1f)) {
                         if (locked && dest != Dest.Splash) {
-                            LockScreen(ctx) { locked = false }
+                            LockScreen(ctx) { locked = false; ctx.requestSync() }
                         } else when (val d = dest) {
                             Dest.Splash -> SplashScreen(onLaunch = { dest = Dest.Login })
                             Dest.Login -> LoginScreen(ctx)

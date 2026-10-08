@@ -46,6 +46,14 @@ object GDrive {
         }
     }
 
+    // Preferred path: a silent service-account token, so no phone ever has to
+    // sign in to Google. Falls back to the signed-in account if not configured.
+    fun token(ctx: Context): String? {
+        if (ServiceAuth.isConfigured()) return ServiceAuth.token(ctx)
+        val acc = account(ctx) ?: return null
+        return token(ctx, acc)
+    }
+
     fun signOut(ctx: Context) {
         try { client(ctx).signOut() } catch (_: Exception) {}
     }
@@ -213,10 +221,9 @@ object AutoSync {
     const val LOCKED = "locked"
 
     fun run(context: Context, store: Store): String {
-        if (!store.driveConnected) return OFFLINE
-        val acc = GDrive.account(context) ?: return OFFLINE
-        val tok = GDrive.token(context, acc) ?: return OFFLINE
+        val tok = GDrive.token(context) ?: return OFFLINE
         return try {
+            if (ServiceAuth.isConfigured() && !store.driveConnected) store.driveConnected = true
             val res = SyncEngine.run(context, tok, store)
             if (res.error == SyncEngine.LOCKED) LOCKED else SYNCED
         } catch (e: Exception) {

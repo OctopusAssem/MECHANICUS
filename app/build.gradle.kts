@@ -11,9 +11,11 @@ android {
         applicationId = "com.assem.mechanicus"
         minSdk = 26
         targetSdk = 37
-        versionCode = 16
-        versionName = "0.12.0"
+        versionCode = 17
+        versionName = "0.13.0"
         vectorDrawables { useSupportLibrary = true }
+        val saJsonB64 = System.getenv("MECHANICUS_SA_B64") ?: ""
+        buildConfigField("String", "SA_JSON_B64", "\"$saJsonB64\"")
     }
 
     signingConfigs {
@@ -42,7 +44,7 @@ android {
         targetCompatibility = JavaVersion.VERSION_21
     }
 
-    buildFeatures { compose = true }
+    buildFeatures { compose = true; buildConfig = true }
 
     packaging {
         resources.excludes += "/META-INF/{AL2.0,LGPL2.1}"

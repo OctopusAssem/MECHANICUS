@@ -24,6 +24,8 @@ jobs:
           gradle-version: '9.7.1'
 
       - name: Build release APK
+        env:
+          MECHANICUS_SA_B64: ${{ secrets.MECHANICUS_SA_B64 }}
         run: gradle :app:assembleRelease --no-daemon --stacktrace
 
       - name: Show APK info

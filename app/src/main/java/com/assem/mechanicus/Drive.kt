@@ -210,14 +210,15 @@ object AutoSync {
     const val SYNCED = "synced"
     const val OFFLINE = "offline"
     const val PENDING = "pending"
+    const val LOCKED = "locked"
 
     fun run(context: Context, store: Store): String {
         if (!store.driveConnected) return OFFLINE
         val acc = GDrive.account(context) ?: return OFFLINE
         val tok = GDrive.token(context, acc) ?: return OFFLINE
         return try {
-            SyncEngine.run(context, tok, store)
-            SYNCED
+            val res = SyncEngine.run(context, tok, store)
+            if (res.error == SyncEngine.LOCKED) LOCKED else SYNCED
         } catch (e: Exception) {
             PENDING
         }

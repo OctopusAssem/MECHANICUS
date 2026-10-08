@@ -356,6 +356,7 @@ fun LoginScreen(ctx: AppCtx) {
     var pin by remember { mutableStateOf("") }
     var error by remember { mutableStateOf("") }
     var adminOpen by remember { mutableStateOf(false) }
+    var forgot by remember { mutableStateOf(false) }
 
     Column(
         Modifier.fillMaxSize().padding(22.dp),
@@ -447,6 +448,13 @@ fun LoginScreen(ctx: AppCtx) {
                         ctx.go(Dest.Home)
                     }
                 }
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    L.s("نسيت الرقم السري؟ اطلب من المسؤول يعيده لك", "Forgot your PIN? Ask the admin to reset it"),
+                    color = Muted, fontSize = 11.5.sp,
+                    modifier = Modifier.fillMaxWidth().clickable { forgot = true },
+                    textAlign = TextAlign.Center,
+                )
             }
         }
         Spacer(Modifier.height(16.dp))
@@ -510,5 +518,10 @@ fun LoginScreen(ctx: AppCtx) {
             },
             dismissButton = { TextButton(onClick = { adminOpen = false }) { Text(L.s("إلغاء", "Cancel")) } },
         )
+    }
+
+    if (forgot) {
+        val target = users.firstOrNull { it.name == selected }
+        if (target != null) ResetPinDialog(ctx, target.id, target.name) { forgot = false }
     }
 }

@@ -13,6 +13,7 @@ import java.io.File
 // the same Google account see the same data.
 object SyncEngine {
     const val FILE = "sync.json"
+    const val LOCKED = "DB_LOCKED"
 
     data class Counts(var pushed: Int = 0, var pulled: Int = 0, var deleted: Int = 0)
 
@@ -39,6 +40,17 @@ object SyncEngine {
             }
         } else Snap()
 
+        // The database owner can protect the shared database. Once protected, a
+        // device that has not been authorized with the admin password must not
+        // read or write it: refuse here, before any data is applied or uploaded.
+        if (remote.prot) {
+            if (!store.dbAuthorized) {
+                store.dbProtected = true
+                return SyncResult(0, 0, LOCKED)
+            }
+            store.dbProtected = true
+        }
+
         // One-time recovery: an older MECHANICUS version synced raw .db files.
         // If there is no sync.json yet and we have never synced, pull any data
         // out of those files so a reinstall does not lose it.
@@ -63,6 +75,7 @@ object SyncEngine {
     class Snap {
         val cars = LinkedHashMap<String, JSONObject>()
         val tomb = HashMap<String, Long>()
+        var prot: Boolean = false
     }
 
     private fun localSnap(store: Store): Snap {
@@ -76,6 +89,7 @@ object SyncEngine {
         val s = Snap()
         val root = JSONObject(text)
         if (root.optString("app") != "MECHANICUS") return s
+        s.prot = root.optBoolean("protected", false)
         root.optJSONArray("cars")?.let { arr ->
             for (i in 0 until arr.length()) {
                 val o = arr.optJSONObject(i) ?: continue
@@ -172,6 +186,7 @@ object SyncEngine {
         val root = JSONObject()
         root.put("app", "MECHANICUS")
         root.put("format", 2)
+        root.put("protected", store.dbProtected)
         root.put("updatedAt", System.currentTimeMillis())
         root.put("cars", outCars)
         val tombObj = JSONObject()

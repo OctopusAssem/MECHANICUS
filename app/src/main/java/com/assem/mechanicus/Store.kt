@@ -63,13 +63,36 @@ class Store(private val ctx: Context) {
         get() = prefs.getString("owner_name", "عاصم حسين")!!
         set(v) = prefs.edit().putString("owner_name", v).apply()
 
-    // Hidden admin sign-in (عاصم حسين + 5555) grants absolute permissions.
+    // Hidden admin sign-in (عاصم حسين + the admin password) grants absolute
+    // permissions. The password is "5555" until the owner sets his own one.
     var adminMode: Boolean
         get() = prefs.getBoolean("admin_mode", false)
         set(v) = prefs.edit().putBoolean("admin_mode", v).apply()
 
+    // The owner's own admin password. Protects the admin sign-in, resetting an
+    // employee's forgotten PIN and the database lock below.
+    var adminPass: String
+        get() = prefs.getString("admin_pass", "5555")!!
+        set(v) = prefs.edit().putString("admin_pass", v.trim()).apply()
+
+    // When true the shared database is protected: a device must be authorized
+    // (with the admin password) before it can sync or move the database.
+    var dbProtected: Boolean
+        get() = prefs.getBoolean("db_protected", false)
+        set(v) = prefs.edit().putBoolean("db_protected", v).apply()
+
+    // Whether THIS device is allowed to touch a protected database.
+    var dbAuthorized: Boolean
+        get() = prefs.getBoolean("db_authorized", false)
+        set(v) = prefs.edit().putBoolean("db_authorized", v).apply()
+
+    fun verifyAdminPass(pass: String): Boolean = pass.trim() == adminPass
+
+    // True when this device may read/write the (possibly protected) database.
+    fun dbAccessAllowed(): Boolean = !dbProtected || dbAuthorized
+
     fun checkAdmin(userName: String, pin: String): Boolean =
-        normName(userName) == normName("عاصم حسين") && pin.trim() == "5555"
+        normName(userName) == normName("عاصم حسين") && pin.trim() == adminPass
 
     fun root(): File = rootFor(useExternal)
 

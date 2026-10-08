@@ -29,7 +29,9 @@ import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Payments
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
@@ -63,6 +65,7 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -277,6 +280,10 @@ fun BottomBar(ctx: AppCtx, dest: Dest) {
 @Composable
 fun SplashScreen(onLaunch: () -> Unit) {
     val L = LocalLang.current
+    LaunchedEffect(Unit) {
+        delay(1200)
+        onLaunch()
+    }
     Box(
         Modifier.fillMaxSize().background(
             Brush.radialGradient(
@@ -301,19 +308,27 @@ fun SplashScreen(onLaunch: () -> Unit) {
                 color = Color(0xFFF43F5E), fontSize = 12.sp, fontWeight = FontWeight.Bold, letterSpacing = 2.sp,
                 textAlign = TextAlign.Center,
             )
+            Spacer(Modifier.height(28.dp))
+            CircularProgressIndicator(
+                color = Color(0xFFF43F5E),
+                strokeWidth = 3.dp,
+                modifier = Modifier.size(32.dp),
+            )
         }
-        Box(
-            Modifier.align(Alignment.BottomCenter).padding(18.dp)
+        Column(
+            Modifier.align(Alignment.BottomCenter).padding(horizontal = 34.dp).padding(bottom = 30.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            Surface(
-                color = Color(0xFFF4F4F5),
-                shape = RoundedCornerShape(15.dp),
-                modifier = Modifier.fillMaxWidth().height(52.dp).clickable { onLaunch() },
-            ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Text("LAUNCH APP", color = Color(0xFF111111), fontWeight = FontWeight.Black, letterSpacing = 2.sp, fontSize = 15.sp)
-                }
-            }
+            LinearProgressIndicator(
+                color = Color(0xFFF43F5E),
+                trackColor = Color(0x33FFFFFF),
+                modifier = Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(3.dp)),
+            )
+            Spacer(Modifier.height(12.dp))
+            Text(
+                L.s("جاري التحميل...", "Loading..."),
+                color = Color(0xFFB9B9C0), fontSize = 12.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp,
+            )
         }
     }
 }

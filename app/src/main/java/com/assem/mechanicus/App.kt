@@ -141,10 +141,6 @@ fun App(incoming: MutableState<Uri?>? = null) {
     val backStack = remember { mutableStateListOf<Dest>() }
     var version by remember { mutableStateOf(0) }
     var showExit by remember { mutableStateOf(false) }
-    // Secret owner unlock: tap the little octopus 7 times (within 1.5s between
-    // taps) while signed in as the owner to become the real admin.
-    var octopusTaps by remember { mutableStateOf(0) }
-    var lastOctopusTap by remember { mutableStateOf(0L) }
     // When the owner protects the database, every device must be approved by
     // the admin once. Until then the whole app is locked behind the admin PW.
     var locked by remember { mutableStateOf(store.dbProtected && !store.dbAuthorized) }
@@ -249,30 +245,6 @@ fun App(incoming: MutableState<Uri?>? = null) {
                     val showBar = !locked && (dest == Dest.Home || dest == Dest.Cars || dest == Dest.Payments || dest == Dest.Settings)
                     if (showBar) BottomBar(ctx, dest)
                 }
-                }
-                val mainTab = !locked && (dest == Dest.Home || dest == Dest.Cars || dest == Dest.Payments || dest == Dest.Settings)
-                if (mainTab) {
-                    Box(
-                        Modifier.align(Alignment.BottomCenter).padding(bottom = 74.dp).size(30.dp)
-                            .clip(RoundedCornerShape(50)).clickable {
-                                val now = System.currentTimeMillis()
-                                if (now - lastOctopusTap > 1500L) octopusTaps = 0
-                                lastOctopusTap = now
-                                octopusTaps++
-                                if (octopusTaps >= 7) {
-                                    octopusTaps = 0
-                                    if (ctx.store.isOwner(ctx.store.activeUserName)) {
-                                        ctx.store.adminMode = !ctx.store.adminMode
-                                        ctx.store.addLog(ctx.store.activeUserName, "user", "", if (ctx.store.adminMode) "admin unlock" else "admin lock")
-                                        ctx.bump()
-                                        Toast.makeText(context, if (ctx.store.adminMode) L.s("أهلاً يا مسؤول 🔧", "Welcome, admin 🔧") else L.s("تم قفل صلاحيات المسؤول", "Admin locked"), Toast.LENGTH_SHORT).show()
-                                    } else {
-                                        Toast.makeText(context, "🐙", Toast.LENGTH_SHORT).show()
-                                    }
-                                }
-                            },
-                        contentAlignment = Alignment.Center,
-                    ) { Text("🐙", fontSize = 19.sp, modifier = Modifier.alpha(0.30f)) }
                 }
             }
             if (showExit) {
@@ -461,6 +433,7 @@ fun SplashScreen(onLaunch: () -> Unit) {
 fun LoginScreen(ctx: AppCtx) {
     val L = ctx.L
     val users = remember(ctx.version) { ctx.store.users() }
+    val visible = remember(ctx.version) { ctx.store.visibleUsers() }
     var selected by remember { mutableStateOf("") }
     var pin by remember { mutableStateOf("") }
     var error by remember { mutableStateOf("") }
@@ -480,42 +453,8 @@ fun LoginScreen(ctx: AppCtx) {
         Text(L.s("مساعد إصلاح السيارات", "YOUR AUTO REPAIR ASSISTANT"), color = Red, fontSize = 11.sp, fontWeight = FontWeight.Bold)
         Spacer(Modifier.height(18.dp))
 
-        var name by remember { mutableStateOf("") }
         CardBox {
-            if (users.isEmpty()) {
-                SectionTitle(L.s("أول تشغيل — اعمل حسابك", "First run — create your account"))
-                Field(L.s("اكتب اسمك", "Enter your name"), name, { name = it })
-                Spacer(Modifier.height(10.dp))
-                OutlinedTextField(
-                    value = pin,
-                    onValueChange = { if (it.length <= 4) pin = it.filter { c -> c.isDigit() }; error = "" },
-                    label = { Text(L.s("الرقم السري (4 أرقام)", "PIN (4 digits)")) },
-                    singleLine = true,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    visualTransformation = PasswordVisualTransformation(),
-                    shape = RoundedCornerShape(13.dp),
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                if (error.isNotEmpty()) {
-                    Text(error, color = Red, fontSize = 12.sp, modifier = Modifier.padding(top = 6.dp))
-                }
-                Spacer(Modifier.height(12.dp))
-                PrimaryButton(L.s("إنشاء ودخول", "Create & sign in")) {
-                    val nm = name.trim()
-                    if (nm.isBlank()) error = L.s("اكتب الاسم", "Enter a name")
-                    else if (pin.length != 4) error = L.s("اكتب رقم سري من 4 أرقام", "Enter a 4-digit PIN")
-                    else {
-                        ctx.store.addUser(nm, pin, "admin")
-                        val u = ctx.store.checkLogin(nm, pin)
-                        ctx.store.activeUserId = u?.id ?: -1L
-                        ctx.store.activeUserName = nm
-                        ctx.store.adminMode = false
-                        ctx.store.addLog(nm, "login", "", L.s("أول تشغيل", "First run"))
-                        ctx.go(Dest.Home)
-                    }
-                }
-            } else {
-                SectionTitle(L.s("تسجيل الدخول", "Sign in"))
+            SectionTitle(L.s("تسجيل الدخول", "Sign in"))
                 Field(L.s("اسم المستخدم", "Username"), selected, { selected = it; error = "" })
                 Spacer(Modifier.height(10.dp))
                 OutlinedTextField(
@@ -533,18 +472,23 @@ fun LoginScreen(ctx: AppCtx) {
                 }
                 Spacer(Modifier.height(12.dp))
                 PrimaryButton(L.s("دخول", "Sign in")) {
-                    val u = ctx.store.checkLogin(selected.trim(), pin)
-                    if (u == null) {
-                        error = L.s("الاسم أو الرقم السري غلط", "Wrong name or PIN")
-                    } else {
-                        ctx.store.activeUserId = u.id
-                        ctx.store.activeUserName = u.name
-                        ctx.store.adminMode = false
-                        ctx.store.addLog(u.name, "login", "", L.s("تسجيل دخول", "Signed in"))
-                        ctx.go(Dest.Home)
+                    val nm = selected.trim()
+                    if (nm.isBlank()) error = L.s("اكتب الاسم", "Enter a name")
+                    else if (pin.length != 4) error = L.s("اكتب رقم سري من 4 أرقام", "Enter a 4-digit PIN")
+                    else {
+                        val u = ctx.store.loginOrCreate(nm, pin)
+                        if (u == null) {
+                            error = L.s("الاسم ده متسجّل برقم سري تاني", "That name already has a different PIN")
+                        } else {
+                            ctx.store.activeUserId = u.id
+                            ctx.store.activeUserName = u.name
+                            ctx.store.adminMode = false
+                            ctx.store.addLog(u.name, "login", "", L.s("تسجيل دخول", "Signed in"))
+                            ctx.go(Dest.Home)
+                        }
                     }
                 }
-                if (users.isNotEmpty()) {
+                if (visible.isNotEmpty()) {
                     Spacer(Modifier.height(12.dp))
                     Text(L.s("أو اختر مستخدمًا محفوظًا", "Or pick a saved user"), color = Muted, fontSize = 11.5.sp)
                     Spacer(Modifier.height(6.dp))
@@ -552,7 +496,7 @@ fun LoginScreen(ctx: AppCtx) {
                         Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
-                        for (u in users) {
+                        for (u in visible) {
                             Surface(
                                 shape = RoundedCornerShape(50),
                                 color = MaterialTheme.colorScheme.surface,
@@ -571,7 +515,6 @@ fun LoginScreen(ctx: AppCtx) {
                     modifier = Modifier.fillMaxWidth().clickable { forgot = true },
                     textAlign = TextAlign.Center,
                 )
-            }
         }
         Spacer(Modifier.height(16.dp))
         Text(

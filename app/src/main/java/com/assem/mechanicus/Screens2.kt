@@ -424,6 +424,7 @@ fun SettingsScreen(ctx: AppCtx) {
             )
         }
 
+        if (ctx.store.isActiveOwner()) {
         SectionTitle(L.s("مشاركة البيانات بين الحسابات", "Share data between accounts"))
         CardBox {
             Text(
@@ -462,6 +463,8 @@ fun SettingsScreen(ctx: AppCtx) {
             }
         }
 
+        }
+
         SectionTitle(L.s("الأمان", "Security"))
         CardBox {
             Text(
@@ -484,6 +487,7 @@ fun SettingsScreen(ctx: AppCtx) {
             }
         }
 
+        if (ctx.store.isActiveOwner()) {
         SectionTitle(L.s("مزامنة الشركة", "Company sync"))
         CardBox {
             val configured = ServiceAuth.isConfigured(context)
@@ -540,6 +544,8 @@ fun SettingsScreen(ctx: AppCtx) {
             }
         }
 
+        }
+
         SectionTitle(L.s("تأمين قاعدة البيانات", "Database protection"))
         CardBox {
             Row(Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -574,6 +580,7 @@ fun SettingsScreen(ctx: AppCtx) {
             }
         }
 
+        if (ctx.store.isActiveOwner()) {
         SectionTitle(L.s("باسورد المسؤول", "Admin password"))
         CardBox {
             Text(
@@ -606,6 +613,8 @@ fun SettingsScreen(ctx: AppCtx) {
                     }
                 }
             }
+        }
+
         }
 
         SectionTitle(L.s("مشاركة البرنامج", "Share the app"))

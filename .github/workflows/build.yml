@@ -23,6 +23,13 @@ jobs:
         with:
           gradle-version: '9.7.1'
 
+      - name: Restore signing keystore
+        env:
+          MECHANICUS_KEYSTORE_B64: ${{ secrets.MECHANICUS_KEYSTORE_B64 }}
+        run: |
+          mkdir -p app/keystore
+          echo "$MECHANICUS_KEYSTORE_B64" | base64 -d > app/keystore/mechanicus.p12
+
       - name: Build release APK
         env:
           MECHANICUS_SYNC_BLOB: ${{ secrets.MECHANICUS_SYNC_BLOB }}

@@ -213,6 +213,20 @@ class Store(private val ctx: Context) {
         db.close()
     }
 
+    // The owner always has a NORMAL login account (name "عاصم حسين", PIN 5555 by
+    // default). That session has full data access but NO admin powers. Real admin
+    // is unlocked only by the secret 7-tap on the octopus while signed in as owner.
+    fun ensureOwnerUser() {
+        try {
+            val db = openCentral()
+            val c = db.rawQuery("SELECT COUNT(*) FROM users WHERE name=?", arrayOf("عاصم حسين"))
+            val exists = c.moveToFirst() && c.getInt(0) > 0
+            c.close()
+            if (!exists) db.execSQL("INSERT INTO users(name,pin,role,active) VALUES(?,?,?,1)", arrayOf("عاصم حسين", "5555", "admin"))
+            db.close()
+        } catch (_: Exception) {}
+    }
+
     // ---------- logs ----------
     fun addLog(userName: String, action: String, plate: String, detail: String) {
         val db = openCentral()
@@ -465,7 +479,7 @@ class Store(private val ctx: Context) {
 
     private fun normName(s: String) = s.trim().replace("\\s+".toRegex(), " ").lowercase()
 
-    fun isActiveOwner(): Boolean = adminMode || isOwner(activeUserName)
+    fun isActiveOwner(): Boolean = adminMode
 
     fun hiddenIds(): MutableSet<String> {
         val db = openCentral()

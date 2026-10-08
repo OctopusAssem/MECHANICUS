@@ -248,6 +248,7 @@ fun actionLabel(L: Lang, action: String): String = when (action) {
     "status" -> L.s("تغيير حالة", "Status change")
     "login" -> L.s("تسجيل دخول", "Sign in")
     "user" -> L.s("مستخدم", "User")
+    "import" -> L.s("استيراد", "Imported")
     else -> action
 }
 
@@ -260,6 +261,20 @@ fun SettingsScreen(ctx: AppCtx) {
     var dark by remember { mutableStateOf(ctx.store.dark) }
     var email by remember { mutableStateOf(ctx.store.driveEmail) }
     var sizeText by remember { mutableStateOf(humanSize(ctx.store.totalSize())) }
+
+    val importLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) {
+            try {
+                val user = ctx.store.activeUserName.ifBlank { "import" }
+                val n = Transfer.importUri(context, ctx.store, uri, user)
+                ctx.store.addLog(user, "import", "", "Imported $n")
+                ctx.bump()
+                Toast.makeText(context, L.s("تم استيراد $n عربية ✅", "Imported $n cars ✅"), Toast.LENGTH_LONG).show()
+            } catch (e: Exception) {
+                Toast.makeText(context, L.s("الملف غير صالح", "Invalid file"), Toast.LENGTH_LONG).show()
+            }
+        }
+    }
 
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp)) {
         ScreenBar(title = L.s("الإعدادات", "Settings"))
@@ -329,6 +344,31 @@ fun SettingsScreen(ctx: AppCtx) {
             }
         }
 
+        SectionTitle(L.s("تصدير واستيراد", "Export & import"))
+        CardBox {
+            Text(
+                L.s(
+                    "صدّر جلسة كملف (.mech) وابعته لأي حد عنده التطبيق — يفتحه ويعمله استيراد عنده.",
+                    "Export a session as a .mech file and send it to anyone using the app — they can open and import it.",
+                ),
+                color = Muted, fontSize = 11.5.sp, modifier = Modifier.padding(vertical = 6.dp),
+            )
+            PrimaryButton(L.s("تصدير جلسة اليوم", "Export today's session")) {
+                Transfer.exportToday(context, ctx.store, L, ctx.store.activeUserName)
+            }
+            Spacer(Modifier.height(8.dp))
+            Surface(
+                shape = RoundedCornerShape(15.dp),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+                color = MaterialTheme.colorScheme.surface,
+                modifier = Modifier.fillMaxWidth().height(52.dp).clickable { Transfer.exportAll(context, ctx.store, L, ctx.store.activeUserName) },
+            ) { Box(contentAlignment = Alignment.Center) { Text(L.s("تصدير كل البيانات", "Export all data"), fontWeight = FontWeight.Bold, fontSize = 15.sp) } }
+            Spacer(Modifier.height(8.dp))
+            PrimaryButton(L.s("استيراد ملف جلسة", "Import a session file")) {
+                importLauncher.launch(arrayOf("*/*"))
+            }
+        }
+
         SectionTitle(L.s("المستخدمون والسجل", "Users & log"))
         CardBox {
             SettingLink(L.s("إدارة المستخدمين", "Manage users")) { ctx.go(Dest.Users) }
@@ -336,7 +376,7 @@ fun SettingsScreen(ctx: AppCtx) {
         }
 
         Spacer(Modifier.height(16.dp))
-        Text("MECHANICUS v0.1.0 • " + L.s("صناعة عاصم حسين", "by Assem Hussein"), color = Muted, fontSize = 12.sp, modifier = Modifier.fillMaxWidth().padding(bottom = 26.dp), textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+        Text("MECHANICUS v" + appVersion(context) + " • " + L.s("صناعة عاصم حسين", "by Assem Hussein"), color = Muted, fontSize = 12.sp, modifier = Modifier.fillMaxWidth().padding(bottom = 26.dp), textAlign = androidx.compose.ui.text.style.TextAlign.Center)
     }
 }
 
@@ -370,6 +410,12 @@ fun humanSize(bytes: Long): String = when {
     bytes > 1024 * 1024 -> String.format(Locale.US, "%.1f MB", bytes / 1024.0 / 1024.0)
     bytes > 1024 -> String.format(Locale.US, "%.0f KB", bytes / 1024.0)
     else -> "$bytes B"
+}
+
+fun appVersion(context: android.content.Context): String = try {
+    context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: ""
+} catch (e: Exception) {
+    ""
 }
 
 // ------------------------- SYNC / GOOGLE -------------------------

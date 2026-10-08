@@ -22,8 +22,10 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AdminPanelSettings
 import androidx.compose.material.icons.filled.DirectionsCar
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Payments
@@ -195,15 +197,17 @@ fun App(incoming: MutableState<Uri?>? = null) {
 
     val dir = if (lang == "ar") LayoutDirection.Rtl else LayoutDirection.Ltr
     CompositionLocalProvider(LocalLang provides L, LocalLayoutDirection provides dir) {
-        MechanicusTheme(true) {
+        MechanicusTheme(dark) {
             Box(
                 Modifier.fillMaxSize().background(
-                    Brush.verticalGradient(listOf(Color(0xFF3A0C12), Color(0xFF14060A), Color(0xFF060304)))
+                    if (dark) Brush.verticalGradient(listOf(Color(0xFF3A0C12), Color(0xFF14060A), Color(0xFF060304)))
+                    else Brush.verticalGradient(listOf(Color(0xFFFFFFFF), Color(0xFFF6F7FB), Color(0xFFECEFF6)))
                 )
             ) {
                 Box(
                     Modifier.fillMaxWidth().height(420.dp).align(Alignment.TopCenter).background(
-                        Brush.radialGradient(listOf(Color(0x55DC2626), Color(0x00000000)))
+                        if (dark) Brush.radialGradient(listOf(Color(0x55DC2626), Color(0x00000000)))
+                        else Brush.radialGradient(listOf(Color(0x1ADC2626), Color(0x00000000)))
                     )
                 )
                 Surface(color = Color.Transparent, contentColor = MaterialTheme.colorScheme.onBackground, modifier = Modifier.fillMaxSize()) {
@@ -351,6 +355,7 @@ fun LoginScreen(ctx: AppCtx) {
     var selected by remember { mutableStateOf(users.firstOrNull()?.name ?: "") }
     var pin by remember { mutableStateOf("") }
     var error by remember { mutableStateOf("") }
+    var adminOpen by remember { mutableStateOf(false) }
 
     Column(
         Modifier.fillMaxSize().padding(22.dp),
@@ -395,6 +400,7 @@ fun LoginScreen(ctx: AppCtx) {
                         val u = ctx.store.checkLogin(nm, pin)
                         ctx.store.activeUserId = u?.id ?: -1L
                         ctx.store.activeUserName = nm
+                        ctx.store.adminMode = false
                         ctx.store.addLog(nm, "login", "", L.s("أول تشغيل", "First run"))
                         ctx.go(Dest.Home)
                     }
@@ -436,15 +442,73 @@ fun LoginScreen(ctx: AppCtx) {
                     } else {
                         ctx.store.activeUserId = u.id
                         ctx.store.activeUserName = u.name
+                        ctx.store.adminMode = false
                         ctx.store.addLog(u.name, "login", "", L.s("تسجيل دخول", "Signed in"))
                         ctx.go(Dest.Home)
                     }
                 }
             }
         }
+        Spacer(Modifier.height(16.dp))
+        Surface(
+            shape = RoundedCornerShape(50),
+            color = MaterialTheme.colorScheme.surface,
+            border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+            modifier = Modifier.clickable { adminOpen = true },
+        ) {
+            Row(Modifier.padding(horizontal = 12.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Filled.AdminPanelSettings, contentDescription = "admin", modifier = Modifier.size(14.dp), tint = Muted)
+                Spacer(Modifier.width(6.dp))
+                Text("admin", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Muted)
+            }
+        }
         Text(
             L.s("الاسم للتعريف بمن سجّل فقط، والبيانات محفوظة على الجهاز.", "The name only identifies who logged the change; data stays on this device."),
             color = Muted, fontSize = 12.sp, textAlign = TextAlign.Center, modifier = Modifier.padding(top = 14.dp),
+        )
+    }
+
+    if (adminOpen) {
+        var aName by remember { mutableStateOf("") }
+        var aPin by remember { mutableStateOf("") }
+        var aErr by remember { mutableStateOf("") }
+        AlertDialog(
+            onDismissRequest = { adminOpen = false },
+            title = { Text(L.s("دخول المسؤول", "Admin access")) },
+            text = {
+                Column {
+                    Text(L.s("الاسم والرقم السري للمسؤول.", "Admin name and PIN."), color = Muted, fontSize = 12.sp)
+                    Spacer(Modifier.height(10.dp))
+                    Field(L.s("اسم المسؤول", "Admin name"), aName, { aName = it; aErr = "" })
+                    Spacer(Modifier.height(8.dp))
+                    OutlinedTextField(
+                        value = aPin,
+                        onValueChange = { if (it.length <= 4) aPin = it.filter { c -> c.isDigit() }; aErr = "" },
+                        label = { Text(L.s("الرقم السري (4 أرقام)", "PIN (4 digits)"), fontSize = 12.sp) },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        visualTransformation = PasswordVisualTransformation(),
+                        shape = RoundedCornerShape(13.dp),
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    if (aErr.isNotEmpty()) Text(aErr, color = Red, fontSize = 12.sp, modifier = Modifier.padding(top = 6.dp))
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    if (ctx.store.checkAdmin(aName, aPin)) {
+                        adminOpen = false
+                        ctx.store.adminMode = true
+                        ctx.store.activeUserId = -1L
+                        ctx.store.activeUserName = "عاصم حسين"
+                        ctx.store.addLog("عاصم حسين", "login", "", L.s("دخول المسؤول (صلاحيات مطلقة)", "Admin sign-in (absolute access)"))
+                        ctx.go(Dest.Home)
+                    } else {
+                        aErr = L.s("الاسم أو الرقم غلط", "Wrong name or PIN")
+                    }
+                }) { Text(L.s("دخول", "Sign in"), fontWeight = FontWeight.Bold, color = Red) }
+            },
+            dismissButton = { TextButton(onClick = { adminOpen = false }) { Text(L.s("إلغاء", "Cancel")) } },
         )
     }
 }

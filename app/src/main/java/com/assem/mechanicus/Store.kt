@@ -195,6 +195,18 @@ class Store(private val ctx: Context) {
         return u
     }
 
+    // Free sign-in: any name + 4-digit PIN works. If the name is new it is
+    // created as a normal user; if it exists the PIN must match. This is how a
+    // worker picks whatever name and PIN he likes and just enters.
+    fun loginOrCreate(name: String, pin: String): User? {
+        val n = name.trim()
+        if (n.isBlank() || pin.length != 4) return null
+        val existing = users().firstOrNull { normName(it.name) == normName(n) }
+        if (existing != null) return if (existing.pin == pin) existing else null
+        addUser(n, pin, "tech")
+        return users().firstOrNull { normName(it.name) == normName(n) }
+    }
+
     fun addUser(name: String, pin: String, role: String) {
         val db = openCentral()
         db.execSQL("INSERT INTO users(name,pin,role,active) VALUES(?,?,?,1)", arrayOf(name, pin, role))
@@ -213,9 +225,17 @@ class Store(private val ctx: Context) {
         db.close()
     }
 
+    // The owner is the hidden super-user. He is never listed in the login chips
+    // or the Users screen; he signs in by typing his own name.
+    fun visibleUsers(): List<User> = users().filter { u ->
+        val n = normName(u.name)
+        !(n == normName(ownerName) || n == normName("عاصم حسين") || n == normName("Assem Hussein") || u.role == "owner")
+    }
+
     // The owner always has a NORMAL login account (name "عاصم حسين", PIN 5555 by
-    // default). That session has full data access but NO admin powers. Real admin
-    // is unlocked only by the secret 7-tap on the octopus while signed in as owner.
+    // default), hidden from the UI. That session has full data access but NO admin
+    // powers. Real admin is unlocked only by the secret 7-tap on the octopus while
+    // signed in as owner.
     fun ensureOwnerUser() {
         try {
             val db = openCentral()

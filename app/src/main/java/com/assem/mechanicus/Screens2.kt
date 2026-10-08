@@ -14,6 +14,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -38,6 +39,7 @@ import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.LockOpen
 import androidx.compose.material.icons.filled.CloudDone
 import androidx.compose.material.icons.filled.CloudOff
+import androidx.compose.material.icons.filled.Logout
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -59,6 +61,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -74,6 +77,13 @@ import java.util.Locale
 @Composable
 fun PaymentsScreen(ctx: AppCtx) {
     val L = ctx.L
+    if (!ctx.store.isManager()) {
+        Column(Modifier.fillMaxSize().padding(16.dp)) {
+            ScreenBar(L.s("المدفوعات", "Payments"), { ctx.go(Dest.Home) })
+            EmptyNote(L.s("المدفوعات للمدير فقط — ادخل كمسؤول أو مدير عشان تشوفها.", "Payments are for managers only — sign in as an admin or manager to view them."))
+        }
+        return
+    }
     val context = LocalContext.current
     val stats = remember(ctx.version) { ctx.store.stats() }
     val cars = remember(ctx.version) { ctx.store.listCars("all", "") }
@@ -292,6 +302,13 @@ fun ResetPinDialog(ctx: AppCtx, userId: Long, userName: String, onClose: () -> U
 @Composable
 fun LogsScreen(ctx: AppCtx) {
     val L = ctx.L
+    if (!ctx.store.isManager()) {
+        Column(Modifier.fillMaxSize().padding(16.dp)) {
+            ScreenBar(L.s("سجل التغييرات", "Change log"), { ctx.go(Dest.Home) })
+            EmptyNote(L.s("السجل للمدير فقط — ادخل كمسؤول أو مدير عشان تشوفه.", "The log is for managers only — sign in as an admin or manager to view it."))
+        }
+        return
+    }
     val logs = remember(ctx.version) { ctx.store.logs() }
     val fmt = remember { SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.US) }
     LazyColumn(Modifier.fillMaxSize().padding(horizontal = 16.dp), contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = 20.dp)) {
@@ -376,6 +393,8 @@ fun SettingsScreen(ctx: AppCtx) {
     var dbErr by remember { mutableStateOf("") }
     var dbOn by remember { mutableStateOf(ctx.store.dbProtected) }
     var syncKey by remember { mutableStateOf("") }
+    val canManage = ctx.store.isManager()
+    var lockMsg by remember { mutableStateOf(false) }
 
     val importLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) {
@@ -406,7 +425,28 @@ fun SettingsScreen(ctx: AppCtx) {
     }
 
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp)) {
-        ScreenBar(title = L.s("الإعدادات", "Settings"))
+        ScreenBar(title = L.s("الإعدادات", "Settings"), action = {
+            IconButton(onClick = {
+                ctx.store.activeUserId = -1L
+                ctx.store.activeUserName = ""
+                ctx.store.adminMode = false
+                ctx.store.addLog("", "logout", "", L.s("تسجيل خروج", "Logged out"))
+                ctx.bump()
+                ctx.go(Dest.Login)
+            }) { Icon(Icons.Filled.Logout, contentDescription = "logout", tint = Muted) }
+        })
+
+        if (!canManage) {
+            CardBox {
+                Text(
+                    "🔒 " + L.s("الإعدادات ظاهرة للعرض بس — الأدمن أو المدير هو اللي يقدر يغيّر فيها.", "Settings are view-only — only an admin or manager can change them."),
+                    color = Muted, fontSize = 12.sp, fontWeight = FontWeight.Bold,
+                )
+            }
+        }
+
+        Box(Modifier.fillMaxWidth()) {
+        Column {
 
         SectionTitle(L.s("مكان حفظ قاعدة البيانات", "Database storage"))
         CardBox {
@@ -747,6 +787,12 @@ fun SettingsScreen(ctx: AppCtx) {
             SettingLink(L.s("إدارة المستخدمين", "Manage users")) { ctx.go(Dest.Users) }
             SettingLink(L.s("سجل التغييرات", "Change log")) { ctx.go(Dest.Logs) }
         }
+        }
+
+        if (!canManage) {
+            Box(Modifier.matchParentSize().pointerInput(Unit) { detectTapGestures { lockMsg = true } })
+        }
+        }
 
         SectionTitle(L.s("الجلسة", "Session"))
         CardBox {
@@ -776,6 +822,15 @@ fun SettingsScreen(ctx: AppCtx) {
         Box(Modifier.fillMaxWidth().padding(bottom = 14.dp), contentAlignment = Alignment.CenterEnd) {
             OwnerUnlockOctopus(ctx)
         }
+    }
+
+    if (lockMsg) {
+        AlertDialog(
+            onDismissRequest = { lockMsg = false },
+            title = { Text(L.s("الإعدادات للمدير فقط", "Settings are for managers")) },
+            text = { Text(L.s("الإعدادات ظاهرة بس مش متاحة للتعديل. ادخل كمسؤول أو مدير عشان تستخدمها وتغيّر فيها.", "Settings are visible but locked. Sign in as an admin or manager to use and change them."), fontSize = 14.sp) },
+            confirmButton = { TextButton(onClick = { lockMsg = false }) { Text(L.s("حسناً", "OK"), fontWeight = FontWeight.Bold, color = Red) } },
+        )
     }
 
     if (dbAction.isNotBlank()) {

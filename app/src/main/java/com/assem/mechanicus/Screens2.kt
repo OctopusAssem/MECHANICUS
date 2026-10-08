@@ -716,6 +716,28 @@ fun SettingsScreen(ctx: AppCtx) {
             SettingLink(L.s("سجل التغييرات", "Change log")) { ctx.go(Dest.Logs) }
         }
 
+        SectionTitle(L.s("الجلسة", "Session"))
+        CardBox {
+            Text(
+                L.s("مسجّل الدخول باسم: ", "Signed in as: ") + ctx.store.activeUserName,
+                color = Muted, fontSize = 12.sp, fontWeight = FontWeight.Bold,
+            )
+            Spacer(Modifier.height(4.dp))
+            Text(
+                L.s("لو خرجت، ترجع لشاشة الدخول وتكتب اسم المستخدم والرقم السري تاني.", "Logging out returns to the login screen, where you enter any username and PIN again."),
+                color = Muted, fontSize = 11.5.sp,
+            )
+            Spacer(Modifier.height(10.dp))
+            GhostButton(L.s("تسجيل الخروج", "Log out")) {
+                ctx.store.activeUserId = -1L
+                ctx.store.activeUserName = ""
+                ctx.store.adminMode = false
+                ctx.store.addLog("", "logout", "", L.s("تسجيل خروج", "Logged out"))
+                ctx.bump()
+                ctx.go(Dest.Login)
+            }
+        }
+
         Spacer(Modifier.height(16.dp))
         Text("MECHANICUS v" + appVersion(context) + " • " + L.s("صناعة عاصم حسين", "by Assem Hussein"), color = Muted, fontSize = 12.sp, modifier = Modifier.fillMaxWidth().padding(bottom = 26.dp), textAlign = androidx.compose.ui.text.style.TextAlign.Center)
     }

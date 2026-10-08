@@ -11,6 +11,8 @@ import androidx.activity.compose.setContent
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -143,7 +145,7 @@ fun App(incoming: MutableState<Uri?>? = null) {
     val L = Lang(lang == "ar")
 
     fun navigate(d: Dest) {
-        val root = d == Dest.Home || d == Dest.Cars || d == Dest.Payments || d == Dest.Settings
+        val root = d == Dest.Home || d == Dest.Cars || d == Dest.Payments || d == Dest.Settings || d == Dest.Login
         if (root) backStack.clear() else backStack.add(dest)
         dest = d
     }
@@ -429,7 +431,7 @@ fun SplashScreen(onLaunch: () -> Unit) {
 fun LoginScreen(ctx: AppCtx) {
     val L = ctx.L
     val users = remember(ctx.version) { ctx.store.users() }
-    var selected by remember { mutableStateOf(users.firstOrNull()?.name ?: "") }
+    var selected by remember { mutableStateOf("") }
     var pin by remember { mutableStateOf("") }
     var error by remember { mutableStateOf("") }
     var adminOpen by remember { mutableStateOf(false) }
@@ -484,21 +486,9 @@ fun LoginScreen(ctx: AppCtx) {
                     }
                 }
             } else {
-                SectionTitle(L.s("اختر المستخدم", "Select user"))
-                for (u in users) {
-                    val on = u.name == selected
-                    Surface(
-                        color = if (on) RedSoft else MaterialTheme.colorScheme.surface,
-                        shape = RoundedCornerShape(13.dp),
-                        border = androidx.compose.foundation.BorderStroke(1.dp, if (on) Red else MaterialTheme.colorScheme.outline),
-                        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp).clickable { selected = u.name },
-                    ) {
-                        Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Text(u.name, fontWeight = FontWeight.Bold, fontSize = 14.sp, color = if (on) RedDeep else MaterialTheme.colorScheme.onSurface)
-                        }
-                    }
-                }
-                Spacer(Modifier.height(6.dp))
+                SectionTitle(L.s("تسجيل الدخول", "Sign in"))
+                Field(L.s("اسم المستخدم", "Username"), selected, { selected = it; error = "" })
+                Spacer(Modifier.height(10.dp))
                 OutlinedTextField(
                     value = pin,
                     onValueChange = { if (it.length <= 4) pin = it.filter { c -> c.isDigit() }; error = "" },
@@ -514,9 +504,9 @@ fun LoginScreen(ctx: AppCtx) {
                 }
                 Spacer(Modifier.height(12.dp))
                 PrimaryButton(L.s("دخول", "Sign in")) {
-                    val u = ctx.store.checkLogin(selected, pin)
+                    val u = ctx.store.checkLogin(selected.trim(), pin)
                     if (u == null) {
-                        error = L.s("الرقم السري غلط", "Wrong PIN")
+                        error = L.s("الاسم أو الرقم السري غلط", "Wrong name or PIN")
                     } else {
                         ctx.store.activeUserId = u.id
                         ctx.store.activeUserName = u.name
@@ -525,7 +515,27 @@ fun LoginScreen(ctx: AppCtx) {
                         ctx.go(Dest.Home)
                     }
                 }
-                Spacer(Modifier.height(8.dp))
+                if (users.isNotEmpty()) {
+                    Spacer(Modifier.height(12.dp))
+                    Text(L.s("أو اختر مستخدمًا محفوظًا", "Or pick a saved user"), color = Muted, fontSize = 11.5.sp)
+                    Spacer(Modifier.height(6.dp))
+                    Row(
+                        Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        for (u in users) {
+                            Surface(
+                                shape = RoundedCornerShape(50),
+                                color = MaterialTheme.colorScheme.surface,
+                                border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+                                modifier = Modifier.clickable { selected = u.name; error = "" },
+                            ) {
+                                Text(u.name, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = RedDeep, modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp))
+                            }
+                        }
+                    }
+                }
+                Spacer(Modifier.height(10.dp))
                 Text(
                     L.s("نسيت الرقم السري؟ اطلب من المسؤول يعيده لك", "Forgot your PIN? Ask the admin to reset it"),
                     color = Muted, fontSize = 11.5.sp,
@@ -544,7 +554,7 @@ fun LoginScreen(ctx: AppCtx) {
             Row(Modifier.padding(horizontal = 12.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
                 Icon(Icons.Filled.AdminPanelSettings, contentDescription = "admin", modifier = Modifier.size(14.dp), tint = Muted)
                 Spacer(Modifier.width(6.dp))
-                Text("admin", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Muted)
+                Text(L.s("دخول المسؤول (عاصم حسين)", "Admin sign-in (Assem Hussein)"), fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Muted)
             }
         }
         Text(

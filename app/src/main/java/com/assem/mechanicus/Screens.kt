@@ -464,7 +464,16 @@ fun DetailScreen(ctx: AppCtx, id: String) {
             Row {
                 IconButton(onClick = { Transfer.exportOne(context, car, L, ctx.store.activeUserName) }) { Icon(Icons.Filled.Share, contentDescription = "export") }
                 IconButton(onClick = { ctx.go(Dest.Edit(id)) }) { Icon(Icons.Filled.Edit, contentDescription = "edit") }
-                IconButton(onClick = { showDel = true }) { Icon(Icons.Filled.Delete, contentDescription = "delete", tint = Red) }
+                IconButton(onClick = {
+                    if (owner) {
+                        showDel = true
+                    } else {
+                        ctx.store.hideCar(car)
+                        ctx.store.addLog(ctx.store.activeUserName, "hide", car.plate, L.s("إزالة من الجهاز فقط", "Hidden on this phone only"))
+                        Toast.makeText(context, L.s("اتشالت من جهازك بس — الحذف النهائي للمالك، والعربية محفوظة على جوجل.", "Removed from your phone only — permanent delete is for the owner; it stays on Google."), Toast.LENGTH_LONG).show()
+                        ctx.bump(); ctx.go(Dest.Cars)
+                    }
+                }) { Icon(Icons.Filled.Delete, contentDescription = "delete", tint = Red) }
             }
         })
         Surface(shape = RoundedCornerShape(18.dp), color = Color(0xFF111827), modifier = Modifier.fillMaxWidth()) {
@@ -524,26 +533,20 @@ fun DetailScreen(ctx: AppCtx, id: String) {
     if (showDel) {
         AlertDialog(
             onDismissRequest = { showDel = false },
-            title = { Text(if (owner) L.s("حذف نهائي", "Delete permanently") else L.s("إزالة من الجهاز", "Remove from this phone")) },
+            title = { Text(L.s("حذف نهائي", "Delete permanently")) },
             text = {
                 Text(
-                    if (owner) L.s("هتحذف العربية نهائيًا من درايف ومن كل الأجهزة. متأكد؟", "This deletes the car permanently from Drive and all devices. Are you sure?")
-                    else L.s("هتختفي من جهازك بس، وهتفضل محفوظة على جوجل ومش بتنمسح. متأكد؟", "It disappears from your phone only and stays saved on Google — it is not deleted. Are you sure?"),
+                    L.s("هتحذف العربية نهائيًا من درايف ومن كل الأجهزة. متأكد؟", "This deletes the car permanently from Drive and all devices. Are you sure?"),
                     fontSize = 14.sp,
                 )
             },
             confirmButton = {
                 TextButton(onClick = {
                     showDel = false
-                    if (owner) {
-                        ctx.store.deleteCar(car)
-                        ctx.store.addLog(ctx.store.activeUserName, "delete", car.plate, L.s("حذف عربية", "Deleted car"))
-                    } else {
-                        ctx.store.hideCar(car)
-                        ctx.store.addLog(ctx.store.activeUserName, "hide", car.plate, L.s("إزالة من الجهاز فقط", "Hidden on this phone only"))
-                    }
+                    ctx.store.deleteCar(car)
+                    ctx.store.addLog(ctx.store.activeUserName, "delete", car.plate, L.s("حذف عربية", "Deleted car"))
                     ctx.bump(); ctx.go(Dest.Cars)
-                }) { Text(if (owner) L.s("حذف", "Delete") else L.s("إزالة", "Remove"), fontWeight = FontWeight.Bold, color = Red) }
+                }) { Text(L.s("حذف", "Delete"), fontWeight = FontWeight.Bold, color = Red) }
             },
             dismissButton = { TextButton(onClick = { showDel = false }) { Text(L.s("إلغاء", "Cancel")) } },
         )

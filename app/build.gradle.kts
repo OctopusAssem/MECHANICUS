@@ -11,8 +11,8 @@ android {
         applicationId = "com.assem.mechanicus"
         minSdk = 26
         targetSdk = 37
-        versionCode = 12
-        versionName = "0.9.1"
+        versionCode = 13
+        versionName = "0.9.2"
         vectorDrawables { useSupportLibrary = true }
     }
 

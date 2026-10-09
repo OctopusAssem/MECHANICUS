@@ -78,13 +78,13 @@ val DarkScheme = darkColorScheme(
     onPrimary = Color.White,
     secondary = Color(0xFFDC2626),
     onSecondary = Color.White,
-    background = Color(0xFF1A0F13),
-    onBackground = Color(0xFFF6EFEF),
-    surface = Color(0xFF2A171C),
+    background = Color(0xFF0A0507),
+    onBackground = Color(0xFFF5ECEC),
+    surface = Color(0xFF190A0E),
     onSurface = Color(0xFFF7EFF0),
-    surfaceVariant = Color(0xFF43202A),
-    onSurfaceVariant = Color(0xFFDCBFC3),
-    outline = Color(0xFF6B313B),
+    surfaceVariant = Color(0xFF2A1015),
+    onSurfaceVariant = Color(0xFFC9A2A6),
+    outline = Color(0xFF4A2027),
 )
 
 @Composable

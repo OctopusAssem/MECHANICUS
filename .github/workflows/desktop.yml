@@ -6,6 +6,7 @@ on:
     branches: [ windows, main ]
     paths:
       - "desktop/**"
+      - "shared/**"
       - "settings.gradle.kts"
       - "build.gradle.kts"
       - "gradle.properties"

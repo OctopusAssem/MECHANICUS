@@ -328,7 +328,7 @@ private fun LoginDesktop(store: Store, L: Lang, version: Int, onDone: () -> Unit
 }
 
 @Composable
-fun TopBar(title: String, subtitle: String, actions: @Composable () -> Unit) {
+fun TopBar(title: String, subtitle: String, actions: @Composable () -> Unit = {}) {
     Surface(color = MaterialTheme.colorScheme.surface, modifier = Modifier.fillMaxWidth()) {
         Row(
             Modifier.fillMaxWidth().padding(horizontal = 22.dp, vertical = 14.dp),

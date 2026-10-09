@@ -30,6 +30,15 @@ jobs:
         with:
           gradle-version: '9.7.1'
 
+      - name: Inject sync blob
+        shell: bash
+        run: |
+          cat > desktop/src/main/kotlin/com/assem/mechanicus/desktop/DesktopConfig.kt <<EOF
+          package com.assem.mechanicus.desktop
+
+          const val SYNC_BLOB = "${{ secrets.MECHANICUS_SYNC_BLOB }}"
+          EOF
+
       - name: Build Windows MSI
         run: gradle :desktop:packageMsi --no-daemon --stacktrace
 

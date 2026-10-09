@@ -17,13 +17,17 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
+import com.assem.mechanicus.AutoSync
 import com.assem.mechanicus.Car
 import com.assem.mechanicus.DesktopPlatform
+import com.assem.mechanicus.Platform
+import com.assem.mechanicus.ServiceAuth
 import com.assem.mechanicus.Status
 import com.assem.mechanicus.Store
 
 fun main() {
     DesktopPlatform.install()
+    Platform.syncBlob = SYNC_BLOB
     val store = Store()
     store.ensureOwnerUser()
     val users = store.users()
@@ -49,8 +53,10 @@ fun main() {
     store.addPayment(car, 1500.0, "مقدم", "عاصم حسين")
     val detail = store.carDetail(car.id)
     val stats = store.stats()
-    val info = "DB OK · users=${users.size} · cars=${store.listCars("all", "").size} · " +
-        "plate=${detail?.plate} · paid=${detail?.payments?.sumOf { it.amount }} · inWork=${stats.inWork}"
+    val syncCfg = ServiceAuth.isConfigured()
+    val syncState = AutoSync.run(store)
+    val info = "users=${users.size} · cars=${store.listCars("all", "").size} · plate=${detail?.plate} · " +
+        "paid=${detail?.payments?.sumOf { it.amount }} · inWork=${stats.inWork} · sync=$syncState (configured=$syncCfg)"
     application {
         Window(onCloseRequest = ::exitApplication, title = "MECHANICUS") {
             Stub(store.root().absolutePath, info)

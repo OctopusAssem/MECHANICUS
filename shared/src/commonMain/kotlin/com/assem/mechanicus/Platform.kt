@@ -22,6 +22,10 @@ object Platform {
     private var versionName: String = ""
     private var notifier: (String) -> Unit = { }
 
+    // AES-GCM encrypted Google service-account blob. Android sets it from
+    // BuildConfig.SYNC_BLOB; the desktop app from its generated config.
+    var syncBlob: String = ""
+
     fun install(
         prefsFactory: (String) -> Prefs,
         dataRoot: String,

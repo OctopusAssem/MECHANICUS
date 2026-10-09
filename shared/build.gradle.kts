@@ -25,7 +25,14 @@ kotlin {
         }
         // Code that both the Android and the desktop targets can share, because
         // both run on the JVM (java.io, java.util, java.text are available here).
-        val jvmShared by creating { dependsOn(commonMain) }
+        val jvmShared by creating {
+            dependsOn(commonMain)
+            dependencies {
+                // org.json is built into Android; the desktop JVM needs it on the
+                // classpath. Both targets minSdk/JVM 21 so java.util.Base64 is fine too.
+                implementation("org.json:json:20240303")
+            }
+        }
         val androidMain by getting { dependsOn(jvmShared) }
         val desktopMain by getting { dependsOn(jvmShared) }
     }

@@ -78,6 +78,21 @@ jobs:
         if: success()
         run: dir desktop\build\compose\binaries\main\msi
 
+      - name: Publish Windows release
+        if: success() && github.ref == 'refs/heads/windows'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          MSI=$(ls desktop/build/compose/binaries/main/msi/*.msi)
+          echo "MSI: $MSI"
+          if ! gh release view desktop-1.0.0 >/dev/null 2>&1; then
+            gh release create desktop-1.0.0 --target windows \
+              --title "MECHANICUS for Windows 1.0.0" \
+              --notes "Windows desktop edition of MECHANICUS (Compose Multiplatform). Offline-first, Arabic/English, silent Google Drive sync via the company key. Install the MSI, sign in with a name + 4-digit PIN, then enter the company key in Settings."
+          fi
+          gh release upload desktop-1.0.0 "$MSI" --clobber
+
       - name: Upload MSI artifact
         if: success()
         uses: actions/upload-artifact@v4

@@ -18,7 +18,11 @@ kotlin {
     jvm("desktop")
 
     sourceSets {
-        val commonMain by getting
+        val commonMain by getting {
+            dependencies {
+                implementation("androidx.sqlite:sqlite-bundled:2.7.1")
+            }
+        }
         // Code that both the Android and the desktop targets can share, because
         // both run on the JVM (java.io, java.util, java.text are available here).
         val jvmShared by creating { dependsOn(commonMain) }

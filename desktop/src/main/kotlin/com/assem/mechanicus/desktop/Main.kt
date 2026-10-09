@@ -17,21 +17,30 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
+import com.assem.mechanicus.Db
 import com.assem.mechanicus.DesktopPlatform
 import com.assem.mechanicus.JvmProbe
+import java.io.File
 
 fun main() {
     DesktopPlatform.install()
-    val folder = JvmProbe.appFolder().absolutePath
+    val folder = JvmProbe.appFolder()
+    val db = Db.open(File(folder, "mechanicus.db").absolutePath)
+    db.exec("CREATE TABLE IF NOT EXISTS probe(id INTEGER PRIMARY KEY, name TEXT, ts INTEGER)")
+    db.run("INSERT OR IGNORE INTO probe(id, name, ts) VALUES(?,?,?)", 1, "مرحبا MECHANICUS", System.currentTimeMillis())
+    db.run("UPDATE probe SET name = ? WHERE id = ?", "MECHANICUS على ويندوز", 1)
+    val rows = db.query("SELECT name, ts FROM probe ORDER BY id") { it.text(0) to it.long(1) }
+    val count = db.query("SELECT COUNT(*) FROM probe") { it.long(0) }.firstOrNull() ?: 0L
+    val info = "SQLite OK · rows=$count · " + rows.joinToString { "${it.first}@${it.second}" }
     application {
         Window(onCloseRequest = ::exitApplication, title = "MECHANICUS") {
-            Stub(folder)
+            Stub(folder.absolutePath, info)
         }
     }
 }
 
 @Composable
-private fun Stub(folder: String) {
+private fun Stub(folder: String, info: String) {
     Box(
         Modifier.fillMaxSize().background(
             Brush.verticalGradient(listOf(Color(0xFF511722), Color(0xFF1A0F13))),
@@ -47,6 +56,8 @@ private fun Stub(folder: String) {
             )
             Spacer(Modifier.height(10.dp))
             Text("Shared module OK", color = Color(0xFFB9B9C0), fontSize = 12.sp)
+            Spacer(Modifier.height(4.dp))
+            Text(info, color = Color(0xFF8DF0A0), fontSize = 12.sp)
             Spacer(Modifier.height(4.dp))
             Text(folder, color = Color(0xFF8A8A92), fontSize = 11.sp)
         }

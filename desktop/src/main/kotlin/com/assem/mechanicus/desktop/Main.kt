@@ -17,24 +17,43 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
-import com.assem.mechanicus.Db
+import com.assem.mechanicus.Car
 import com.assem.mechanicus.DesktopPlatform
-import com.assem.mechanicus.JvmProbe
-import java.io.File
+import com.assem.mechanicus.Status
+import com.assem.mechanicus.Store
 
 fun main() {
     DesktopPlatform.install()
-    val folder = JvmProbe.appFolder()
-    val db = Db.open(File(folder, "mechanicus.db").absolutePath)
-    db.exec("CREATE TABLE IF NOT EXISTS probe(id INTEGER PRIMARY KEY, name TEXT, ts INTEGER)")
-    db.run("INSERT OR IGNORE INTO probe(id, name, ts) VALUES(?,?,?)", 1, "مرحبا MECHANICUS", System.currentTimeMillis())
-    db.run("UPDATE probe SET name = ? WHERE id = ?", "MECHANICUS على ويندوز", 1)
-    val rows = db.query("SELECT name, ts FROM probe ORDER BY id") { it.text(0) to it.long(1) }
-    val count = db.query("SELECT COUNT(*) FROM probe") { it.long(0) }.firstOrNull() ?: 0L
-    val info = "SQLite OK · rows=$count · " + rows.joinToString { "${it.first}@${it.second}" }
+    val store = Store()
+    store.ensureOwnerUser()
+    val users = store.users()
+    val car = store.saveCar(
+        Car(
+            id = store.newId(),
+            plate = "س ط ص 1234",
+            engine = "ENG-001",
+            odometer = "125000",
+            make = "تويوتا",
+            model = "كورولا",
+            deliveryDate = store.monthKey(System.currentTimeMillis()),
+            customer = "عميل تجريبي",
+            phone = "01000000000",
+            worker = "فني",
+            intake = "صيانة دورية",
+            status = Status.WORK,
+            monthKey = "",
+            createdAt = 0L,
+            updatedAt = 0L,
+        )
+    )
+    store.addPayment(car, 1500.0, "مقدم", "عاصم حسين")
+    val detail = store.carDetail(car.id)
+    val stats = store.stats()
+    val info = "DB OK · users=${users.size} · cars=${store.listCars("all", "").size} · " +
+        "plate=${detail?.plate} · paid=${detail?.payments?.sumOf { it.amount }} · inWork=${stats.inWork}"
     application {
         Window(onCloseRequest = ::exitApplication, title = "MECHANICUS") {
-            Stub(folder.absolutePath, info)
+            Stub(store.root().absolutePath, info)
         }
     }
 }
@@ -55,7 +74,7 @@ private fun Stub(folder: String, info: String) {
                 color = Color(0xFFF43F5E), fontSize = 13.sp, fontWeight = FontWeight.Bold, letterSpacing = 2.sp,
             )
             Spacer(Modifier.height(10.dp))
-            Text("Shared module OK", color = Color(0xFFB9B9C0), fontSize = 12.sp)
+            Text("Shared data layer OK", color = Color(0xFFB9B9C0), fontSize = 12.sp)
             Spacer(Modifier.height(4.dp))
             Text(info, color = Color(0xFF8DF0A0), fontSize = 12.sp)
             Spacer(Modifier.height(4.dp))

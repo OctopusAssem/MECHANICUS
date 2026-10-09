@@ -2,6 +2,7 @@ package com.assem.mechanicus
 
 import android.content.Context
 import android.content.SharedPreferences
+import android.os.Environment
 import android.widget.Toast
 
 private class AndroidPrefs(private val sp: SharedPreferences) : Prefs {
@@ -21,11 +22,23 @@ object AndroidPlatform {
         val version = try {
             app.packageManager.getPackageInfo(app.packageName, 0).versionName ?: ""
         } catch (_: Exception) { "" }
+        val external = run {
+            val dirs = app.getExternalFilesDirs(null)
+            var ext = ""
+            for (d in dirs) {
+                if (d == null) continue
+                val removable = try { Environment.isExternalStorageRemovable(d) } catch (_: Exception) { false }
+                if (removable) { ext = d.absolutePath; break }
+            }
+            if (ext.isBlank()) ext = dirs.filterNotNull().firstOrNull()?.absolutePath ?: ""
+            ext
+        }
         Platform.install(
             prefsFactory = { name -> AndroidPrefs(app.getSharedPreferences(name, Context.MODE_PRIVATE)) },
             dataRoot = app.filesDir.absolutePath,
             version = version,
             notify = { msg -> Toast.makeText(app, msg, Toast.LENGTH_SHORT).show() },
+            externalRoot = external,
         )
     }
 }

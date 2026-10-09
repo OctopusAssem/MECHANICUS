@@ -54,6 +54,7 @@ class Db private constructor(private val conn: SQLiteConnection) {
 
 class Row internal constructor(private val st: SQLiteStatement) {
     fun text(i: Int): String = st.getText(i)
+    fun textOr(i: Int, def: String): String = if (st.isNull(i)) def else st.getText(i)
     fun long(i: Int): Long = st.getLong(i)
     fun int(i: Int): Int = st.getInt(i)
     fun double(i: Int): Double = st.getDouble(i)

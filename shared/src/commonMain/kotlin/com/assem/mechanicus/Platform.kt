@@ -18,6 +18,7 @@ interface Prefs {
 object Platform {
     private var prefsFactory: ((String) -> Prefs)? = null
     private var dataRootPath: String = ""
+    private var externalRootPath: String = ""
     private var versionName: String = ""
     private var notifier: (String) -> Unit = { }
 
@@ -26,9 +27,11 @@ object Platform {
         dataRoot: String,
         version: String,
         notify: (String) -> Unit,
+        externalRoot: String = "",
     ) {
         this.prefsFactory = prefsFactory
         this.dataRootPath = dataRoot
+        this.externalRootPath = externalRoot
         this.versionName = version
         this.notifier = notify
     }
@@ -37,6 +40,7 @@ object Platform {
         requireNotNull(prefsFactory) { "Platform not installed" }(name)
 
     val dataRoot: String get() = dataRootPath
+    val externalRoot: String get() = externalRootPath
     val version: String get() = versionName
     fun notify(message: String) = notifier(message)
 }

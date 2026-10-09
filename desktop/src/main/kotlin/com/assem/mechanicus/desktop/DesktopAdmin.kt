@@ -66,15 +66,10 @@ fun SettingsDesktop(
             }
         }
 
+        if (owner) {
         SectionTitle(L.s("مزامنة الشركة", "Company sync"))
         CardBox {
-            if (!owner) {
-                Text(
-                    if (ownerName) L.s("بطاقات المسؤول مخفية — اضغط 🐙 أسفل الشاشة 7 مرات لفتحها.", "Admin cards are hidden — tap the 🐙 at the bottom 7 times to reveal them.")
-                    else L.s("هذه البطاقات للمسؤول فقط.", "These cards are for the admin only."),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.5.sp,
-                )
-            } else if (!configured) {
+            if (!configured) {
                 Text(
                     L.s(
                         "أدخل مفتاح الشركة مرة واحدة على هذا الجهاز لتفعيل المزامنة الصامتة بدون تسجيل دخول جوجل.",
@@ -121,6 +116,7 @@ fun SettingsDesktop(
                     }
                 }
             }
+        }
         }
 
         if (owner) {

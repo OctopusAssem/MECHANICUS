@@ -41,11 +41,25 @@ fun HomeDesktop(
     val cars = remember(version) { store.listCars("all", "").take(6) }
     val manager = store.isManager()
 
+    val doSync: () -> Unit = {
+        scope.launch {
+            val r = withContext(Dispatchers.IO) { runCatching { com.assem.mechanicus.AutoSync.run(store) }.getOrDefault("") }
+            when (r) {
+                com.assem.mechanicus.AutoSync.SYNCED -> { bump(); banner(L.s("تمت المزامنة ✅", "Synced ✅")) }
+                com.assem.mechanicus.AutoSync.LOCKED -> banner(L.s("قاعدة البيانات محمية — محتاج تصريح المسؤول", "Database protected — admin authorization needed"))
+                com.assem.mechanicus.AutoSync.PENDING -> banner(L.s("أوفلاين — هيتم تلقائيًا لما النت يرجع", "Offline — will sync when back online"))
+                else -> banner(L.s("مفيش مزامنة — اتأكد من مفتاح الشركة من الإعدادات", "No sync — check the company key in Settings"))
+            }
+        }
+    }
+
     ContentScroll {
         TopBar(
             L.s("الرئيسية", "Home"),
             L.s("نظرة سريعة على الورشة", "A quick look at the shop"),
         ) {
+            GhostButton(L.s("🔄 مزامنة الآن", "🔄 Sync now"), Modifier.width(155.dp)) { doSync() }
+            Spacer(Modifier.width(10.dp))
             GhostButton(L.s("＋ عربية جديدة", "＋ New car"), Modifier.width(160.dp)) { go(Scr.Edit(null)) }
             Spacer(Modifier.width(10.dp))
             GhostButton(L.s("كل العربيات", "All cars"), Modifier.width(130.dp)) { go(Scr.Cars) }
@@ -116,17 +130,7 @@ fun HomeDesktop(
                     }
                     Text(state, fontSize = 13.sp, fontWeight = FontWeight.Bold, color = if (store.syncPending) Color(0xFFFBBF24) else Green)
                     Spacer(Modifier.height(12.dp))
-                    GhostButton(L.s("مزامنة الآن", "Sync now"), Modifier.fillMaxWidth()) {
-                        scope.launch {
-                            val r = withContext(Dispatchers.IO) { runCatching { com.assem.mechanicus.AutoSync.run(store) }.getOrDefault("") }
-                            when (r) {
-                                com.assem.mechanicus.AutoSync.SYNCED -> { bump(); banner(L.s("تمت المزامنة ✅", "Synced ✅")) }
-                                com.assem.mechanicus.AutoSync.LOCKED -> banner(L.s("قاعدة البيانات محمية — محتاج تصريح المسؤول", "Database protected — admin authorization needed"))
-                                com.assem.mechanicus.AutoSync.PENDING -> banner(L.s("أوفلاين — هيتم تلقائيًا لما النت يرجع", "Offline — will sync when back online"))
-                                else -> banner(L.s("تعذّرت المزامنة", "Sync failed"))
-                            }
-                        }
-                    }
+                    GhostButton(L.s("مزامنة الآن", "Sync now"), Modifier.fillMaxWidth()) { doSync() }
                 }
             }
         }

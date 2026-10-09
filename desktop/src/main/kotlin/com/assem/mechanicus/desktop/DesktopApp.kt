@@ -21,10 +21,12 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
@@ -48,12 +50,14 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.assem.mechanicus.AutoSync
+import com.assem.mechanicus.Platform
 import com.assem.mechanicus.ServiceAuth
 import com.assem.mechanicus.Store
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.io.File
 
 sealed interface Scr {
     data object Login : Scr
@@ -80,6 +84,27 @@ fun DesktopApp(store: Store) {
     val scope = rememberCoroutineScope()
     val dir = if (isAr) LayoutDirection.Rtl else LayoutDirection.Ltr
 
+    // An "update.msi" placed in the program folder means a new version is ready.
+    var updateFile by remember { mutableStateOf<File?>(null) }
+    var updateDismissedKey by remember { mutableStateOf("") }
+    var showUpdate by remember { mutableStateOf(false) }
+    fun refreshUpdate() {
+        val f = DesktopUpdate.pending() ?: return
+        val key = "${f.absolutePath}:${f.lastModified()}:${f.length()}"
+        if (key != updateDismissedKey) {
+            updateFile = f
+            showUpdate = true
+        }
+    }
+
+    LaunchedEffect(Unit) {
+        refreshUpdate()
+        while (true) {
+            delay(4000)
+            refreshUpdate()
+        }
+    }
+
     LaunchedEffect(Unit) {
         if (ServiceAuth.isConfigured() && !store.driveConnected) store.driveConnected = true
         if (store.driveConnected) {
@@ -102,31 +127,36 @@ fun DesktopApp(store: Store) {
                     Modifier.fillMaxWidth().height(420.dp).align(Alignment.TopCenter)
                         .background(Brush.radialGradient(listOf(Color(0x55DC2626), Color(0x00000000)))),
                 )
-                if (dest == Scr.Login) {
-                    LoginDesktop(store, L, version) { dest = Scr.Home }
-                } else {
-                    Row(Modifier.fillMaxSize()) {
-                        SideNav(store, L, dest, { version++ }) { d -> dest = d }
-                        Column(Modifier.weight(1f).fillMaxSize()) {
-                            Surface(color = Color.Transparent, contentColor = MaterialTheme.colorScheme.onBackground) {
-                                Column(Modifier.fillMaxSize()) {
-                                    Box(Modifier.weight(1f)) {
-                                        ScreenHost(
-                                            store = store, dest = dest, L = L, version = version,
-                                            scope = scope, isAr = isAr,
-                                            go = { dest = it },
-                                            bump = { version++ },
-                                            setLang = { lang = it; store.lang = it },
-                                        )
+                Column(Modifier.fillMaxSize()) {
+                    Box(Modifier.weight(1f)) {
+                        if (dest == Scr.Login) {
+                            LoginDesktop(store, L, version) { dest = Scr.Home }
+                        } else {
+                            Row(Modifier.fillMaxSize()) {
+                                SideNav(store, L, dest, { version++ }) { d -> dest = d }
+                                Column(Modifier.weight(1f).fillMaxSize()) {
+                                    Surface(color = Color.Transparent, contentColor = MaterialTheme.colorScheme.onBackground) {
+                                        Column(Modifier.fillMaxSize()) {
+                                            Box(Modifier.weight(1f)) {
+                                                ScreenHost(
+                                                    store = store, dest = dest, L = L, version = version,
+                                                    scope = scope, isAr = isAr,
+                                                    go = { dest = it },
+                                                    bump = { version++ },
+                                                    setLang = { lang = it; store.lang = it },
+                                                )
+                                            }
+                                        }
                                     }
                                 }
                             }
                         }
                     }
+                    StatusBar(L, isAr)
                 }
                 banner?.let { msg ->
                     Surface(
-                        modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 22.dp),
+                        modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 46.dp),
                         shape = RoundedCornerShape(14.dp),
                         color = MaterialTheme.colorScheme.surface,
                         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
@@ -134,6 +164,24 @@ fun DesktopApp(store: Store) {
                     ) {
                         Text(msg, modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp), fontSize = 13.sp, fontWeight = FontWeight.Bold)
                     }
+                }
+                if (showUpdate && updateFile != null) {
+                    UpdateDialog(
+                        L = L,
+                        onNow = {
+                            val f = updateFile
+                            if (f != null && DesktopUpdate.install(f)) {
+                                kotlin.system.exitProcess(0)
+                            } else {
+                                banner = L.s("مش قادر أفتح ملف التحديث", "Couldn't start the update")
+                                showUpdate = false
+                            }
+                        },
+                        onLater = {
+                            showUpdate = false
+                            updateFile?.let { updateDismissedKey = "${it.absolutePath}:${it.lastModified()}:${it.length()}" }
+                        },
+                    )
                 }
             }
         }
@@ -379,4 +427,58 @@ fun TopBar(title: String, subtitle: String, actions: @Composable () -> Unit = {}
 @Composable
 fun ContentScroll(content: @Composable () -> Unit) {
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(22.dp)) { content() }
+}
+
+// Bottom status bar: the program version sits in the bottom-right corner.
+@Composable
+private fun StatusBar(L: Lang, isAr: Boolean) {
+    Surface(color = Color(0xFF160A0E), modifier = Modifier.fillMaxWidth()) {
+        Row(
+            Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 5.dp),
+            horizontalArrangement = if (isAr) Arrangement.Start else Arrangement.End,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                L.s("الإصدار", "Version") + " " + Platform.version,
+                fontSize = 11.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = MutedDark,
+            )
+        }
+    }
+}
+
+// Shown when an update.msi appears in the program folder.
+@Composable
+private fun UpdateDialog(L: Lang, onNow: () -> Unit, onLater: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onLater,
+        title = { Text(L.s("في تحديث جديد متاح", "A new update is available")) },
+        text = {
+            Column {
+                Text(
+                    L.s(
+                        "لقينا ملف تحديث (update.msi) جوه مجلد البرنامج.",
+                        "We found an update file (update.msi) in the program folder.",
+                    ),
+                    fontSize = 14.sp,
+                )
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    L.s(
+                        "تحب تحدّث دلوقتي؟ البرنامج هيتقفل لحظيًا عشان التثبيت يكمّل، وبعدها افتحه تاني.",
+                        "Update now? The app will close briefly so the install can finish, then open it again.",
+                    ),
+                    fontSize = 12.5.sp,
+                    color = MutedDark,
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onNow) { Text(L.s("تحديث الآن", "Update now"), fontWeight = FontWeight.Bold) }
+        },
+        dismissButton = {
+            TextButton(onClick = onLater) { Text(L.s("لاحقًا", "Later")) }
+        },
+    )
 }

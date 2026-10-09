@@ -122,6 +122,24 @@ object GDrive {
         return Pair(o.getString("id"), parseTime(o.optString("modifiedTime")))
     }
 
+    // Locate an update installer published to the shared Drive folder. Matches
+    // any "*.msi" whose name contains "update" (e.g. update.msi,
+    // update-1.0.7.msi) and returns (id, name, modifiedTime).
+    fun findUpdate(token: String): Triple<String, String, Long>? {
+        val q = URLEncoder.encode("name contains 'update' and name contains '.msi' and trashed=false", "UTF-8")
+        val c = open("$API?q=$q&fields=files(id,name,modifiedTime)&supportsAllDrives=true&includeItemsFromAllDrives=true&orderBy=modifiedTime desc&pageSize=50", token, "GET")
+        val body = readAll(c)
+        if (c.responseCode !in 200..299) return null
+        val files = JSONObject(body).optJSONArray("files") ?: return null
+        for (i in 0 until files.length()) {
+            val o = files.getJSONObject(i)
+            val name = o.optString("name", "")
+            if (!name.lowercase(Locale.ROOT).endsWith(".msi")) continue
+            return Triple(o.getString("id"), name, parseTime(o.optString("modifiedTime")))
+        }
+        return null
+    }
+
     fun uploadFile(token: String, folderId: String, file: File, existingId: String?): String {
         val boundary = "mech" + System.nanoTime()
         val meta = JSONObject()

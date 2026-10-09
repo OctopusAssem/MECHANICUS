@@ -84,24 +84,30 @@ fun DesktopApp(store: Store) {
     val scope = rememberCoroutineScope()
     val dir = if (isAr) LayoutDirection.Rtl else LayoutDirection.Ltr
 
-    // An "update.msi" placed in the program folder means a new version is ready.
+    // A newer "*.msi" (in the program folder, or pulled from Drive) is an update.
     var updateFile by remember { mutableStateOf<File?>(null) }
+    var updateVersion by remember { mutableStateOf("") }
     var updateDismissedKey by remember { mutableStateOf("") }
     var showUpdate by remember { mutableStateOf(false) }
-    fun refreshUpdate() {
-        val f = DesktopUpdate.pending() ?: return
-        val key = "${f.absolutePath}:${f.lastModified()}:${f.length()}"
-        if (key != updateDismissedKey) {
-            updateFile = f
-            showUpdate = true
-        }
-    }
 
     LaunchedEffect(Unit) {
-        refreshUpdate()
         while (true) {
-            delay(4000)
-            refreshUpdate()
+            // Read the installer's version off the UI thread (it may invoke the
+            // Windows Installer), and pull any published update from Drive.
+            val info = withContext(Dispatchers.IO) {
+                runCatching { DesktopUpdate.pullFromDrive() }
+                runCatching { DesktopUpdate.pending() }.getOrNull()
+            }
+            if (info != null) {
+                val f = info.file
+                val key = "${f.absolutePath}:${f.lastModified()}:${f.length()}"
+                if (key != updateDismissedKey) {
+                    updateFile = f
+                    updateVersion = info.version
+                    showUpdate = true
+                }
+            }
+            delay(15000)
         }
     }
 
@@ -168,6 +174,8 @@ fun DesktopApp(store: Store) {
                 if (showUpdate && updateFile != null) {
                     UpdateDialog(
                         L = L,
+                        version = updateVersion,
+                        current = Platform.version,
                         onNow = {
                             val f = updateFile
                             if (f != null && DesktopUpdate.install(f)) {
@@ -448,9 +456,9 @@ private fun StatusBar(L: Lang, isAr: Boolean) {
     }
 }
 
-// Shown when an update.msi appears in the program folder.
+// Shown when a newer version's installer is found.
 @Composable
-private fun UpdateDialog(L: Lang, onNow: () -> Unit, onLater: () -> Unit) {
+private fun UpdateDialog(L: Lang, version: String, current: String, onNow: () -> Unit, onLater: () -> Unit) {
     AlertDialog(
         onDismissRequest = onLater,
         title = { Text(L.s("في تحديث جديد متاح", "A new update is available")) },
@@ -458,8 +466,8 @@ private fun UpdateDialog(L: Lang, onNow: () -> Unit, onLater: () -> Unit) {
             Column {
                 Text(
                     L.s(
-                        "لقينا ملف تحديث (update.msi) جوه مجلد البرنامج.",
-                        "We found an update file (update.msi) in the program folder.",
+                        "لقينا نسخة أحدث من البرنامج: الإصدار $version (النسخة الحالية $current).",
+                        "A newer version of the program is available: $version (current $current).",
                     ),
                     fontSize = 14.sp,
                 )

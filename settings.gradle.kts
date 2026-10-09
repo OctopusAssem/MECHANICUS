@@ -14,3 +14,4 @@ dependencyResolutionManagement {
 }
 rootProject.name = "MECHANICUS"
 include(":app")
+include(":desktop")

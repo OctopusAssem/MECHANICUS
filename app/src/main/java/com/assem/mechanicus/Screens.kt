@@ -123,6 +123,26 @@ fun PhoneRow(ctx: AppCtx, phone: String) {
     }
 }
 
+// Compact WhatsApp + call buttons used in list rows. Only shown for a real number.
+@Composable
+fun QuickContact(phone: String) {
+    val L = LocalLang.current
+    val context = LocalContext.current
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Box(
+            Modifier.size(30.dp).clip(RoundedCornerShape(10.dp)).background(Color(0x1A25D366))
+                .clickable { Contact.whatsapp(context, phone, L.s("واتساب غير مثبّت", "WhatsApp is not installed")) },
+            contentAlignment = Alignment.Center,
+        ) { Icon(painterResource(R.drawable.ic_whatsapp), contentDescription = L.s("ارسال رسالة واتساب", "Send WhatsApp message"), tint = Color.Unspecified, modifier = Modifier.size(20.dp)) }
+        Spacer(Modifier.size(6.dp))
+        Box(
+            Modifier.size(30.dp).clip(RoundedCornerShape(10.dp)).background(Color(0x1A2563EB))
+                .clickable { Contact.dial(context, phone, L.s("مش قادر أفتح الاتصال", "Can't open the dialer")) },
+            contentAlignment = Alignment.Center,
+        ) { Icon(Icons.Filled.Call, contentDescription = L.s("اتصال تليفون", "Phone call"), tint = Color(0xFF2563EB), modifier = Modifier.size(19.dp)) }
+    }
+}
+
 @Composable
 fun PhotoThumb(path: String?, onClick: () -> Unit) {
     val context = LocalContext.current
@@ -324,10 +344,17 @@ fun CarListItem(row: IndexRow, showMoney: Boolean = true, onClick: () -> Unit) {
                     StatusChip(row.status)
                 }
                 Text(row.customer, fontWeight = FontWeight.Bold, fontSize = 14.sp, modifier = Modifier.padding(top = 5.dp))
-                Text(
-                    listOf(row.phone, row.adate).filter { it.isNotBlank() }.joinToString("   •   "),
-                    color = Muted, fontSize = 11.5.sp,
-                )
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 2.dp)) {
+                    Text(
+                        listOf(row.phone, row.adate).filter { it.isNotBlank() }.joinToString("   •   "),
+                        color = Muted, fontSize = 11.5.sp,
+                        modifier = Modifier.weight(1f),
+                    )
+                    if (Contact.valid(row.phone)) {
+                        Spacer(Modifier.size(6.dp))
+                        QuickContact(row.phone)
+                    }
+                }
             }
             Column(horizontalAlignment = Alignment.End) {
                 if (showMoney) {

@@ -17,15 +17,21 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
+import com.assem.mechanicus.DesktopPlatform
+import com.assem.mechanicus.JvmProbe
 
-fun main() = application {
-    Window(onCloseRequest = ::exitApplication, title = "MECHANICUS") {
-        Stub()
+fun main() {
+    DesktopPlatform.install()
+    val folder = JvmProbe.appFolder().absolutePath
+    application {
+        Window(onCloseRequest = ::exitApplication, title = "MECHANICUS") {
+            Stub(folder)
+        }
     }
 }
 
 @Composable
-private fun Stub() {
+private fun Stub(folder: String) {
     Box(
         Modifier.fillMaxSize().background(
             Brush.verticalGradient(listOf(Color(0xFF511722), Color(0xFF1A0F13))),
@@ -40,7 +46,9 @@ private fun Stub() {
                 color = Color(0xFFF43F5E), fontSize = 13.sp, fontWeight = FontWeight.Bold, letterSpacing = 2.sp,
             )
             Spacer(Modifier.height(10.dp))
-            Text("Windows build pipeline OK", color = Color(0xFFB9B9C0), fontSize = 12.sp)
+            Text("Shared module OK", color = Color(0xFFB9B9C0), fontSize = 12.sp)
+            Spacer(Modifier.height(4.dp))
+            Text(folder, color = Color(0xFF8A8A92), fontSize = 11.sp)
         }
     }
 }

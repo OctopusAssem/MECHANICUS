@@ -11,6 +11,7 @@ kotlin {
 }
 
 dependencies {
+    implementation(project(":shared"))
     implementation(compose.desktop.currentOs)
     implementation(compose.material3)
     implementation("org.xerial:sqlite-jdbc:3.53.4.0")

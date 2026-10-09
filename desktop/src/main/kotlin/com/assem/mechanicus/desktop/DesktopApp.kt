@@ -35,6 +35,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -105,7 +106,7 @@ fun DesktopApp(store: Store) {
                     LoginDesktop(store, L, version) { dest = Scr.Home }
                 } else {
                     Row(Modifier.fillMaxSize()) {
-                        SideNav(store, L, dest) { d -> dest = d }
+                        SideNav(store, L, dest, { version++ }) { d -> dest = d }
                         Column(Modifier.weight(1f).fillMaxSize()) {
                             Surface(color = Color.Transparent, contentColor = MaterialTheme.colorScheme.onBackground) {
                                 Column(Modifier.fillMaxSize()) {
@@ -165,7 +166,7 @@ private fun ScreenHost(
 }
 
 @Composable
-private fun SideNav(store: Store, L: Lang, dest: Scr, go: (Scr) -> Unit) {
+private fun SideNav(store: Store, L: Lang, dest: Scr, bump: () -> Unit, go: (Scr) -> Unit) {
     var confirmOut by remember { mutableStateOf(false) }
     Surface(color = Color(0xFF160A0E), modifier = Modifier.requiredWidth(210.dp).fillMaxHeight()) {
         Column(Modifier.fillMaxSize().padding(14.dp)) {
@@ -208,8 +209,42 @@ private fun SideNav(store: Store, L: Lang, dest: Scr, go: (Scr) -> Unit) {
                 store.adminMode = false
                 go(Scr.Login)
             }
+            Spacer(Modifier.height(6.dp))
+            Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.CenterEnd) {
+                OwnerUnlockOctopus(store, L, bump)
+            }
         }
     }
+}
+
+// Secret owner unlock (same behaviour as the phone app): tap the little octopus
+// 7 times with gaps under 1.5s while signed in as the owner to toggle the real
+// admin powers (which reveal the full settings). Anyone else just gets a 🐙.
+@Composable
+private fun OwnerUnlockOctopus(store: Store, L: Lang, bump: () -> Unit) {
+    val banner = LocalBanner.current
+    var taps by remember { mutableStateOf(0) }
+    var last by remember { mutableStateOf(0L) }
+    Box(
+        Modifier.size(36.dp).clip(RoundedCornerShape(50)).clickable {
+            val now = System.currentTimeMillis()
+            if (now - last > 1500L) taps = 0
+            last = now
+            taps++
+            if (taps >= 7) {
+                taps = 0
+                if (store.isOwner(store.activeUserName)) {
+                    store.adminMode = !store.adminMode
+                    store.addLog(store.activeUserName, "user", "", if (store.adminMode) "admin unlock" else "admin lock")
+                    bump()
+                    banner(if (store.adminMode) L.s("أهلاً يا مسؤول 🔧", "Welcome, admin 🔧") else L.s("تم قفل صلاحيات المسؤول", "Admin locked"))
+                } else {
+                    banner("🐙")
+                }
+            }
+        },
+        contentAlignment = Alignment.Center,
+    ) { Text("🐙", fontSize = 19.sp, modifier = Modifier.alpha(0.45f)) }
 }
 
 private fun stripWhitespace(s: String) = s.trim()

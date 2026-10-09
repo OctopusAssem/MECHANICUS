@@ -20,6 +20,8 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: windows
 
       - uses: actions/setup-java@v4
         with:
@@ -40,12 +42,44 @@ jobs:
           EOF
 
       - name: Build Windows MSI
-        run: gradle :desktop:packageMsi --no-daemon --stacktrace
+        id: build
+        shell: bash
+        run: |
+          set -o pipefail
+          gradle :desktop:packageMsi --no-daemon --stacktrace 2>&1 | tee build.log
+
+      - name: Collect errors
+        if: failure()
+        shell: bash
+        run: |
+          {
+            echo "=== e: / error: lines ==="
+            grep -aE '^e: |^w: |error:|Unresolved reference|Type mismatch|Cannot access|No value passed|only safe|Overload resolution ambiguity|None of the following' build.log | head -120
+            echo ""
+            echo "=== context ==="
+            grep -aE -B3 -A8 '^e: ' build.log | head -300
+            echo ""
+            echo "=== FAILURE ==="
+            grep -aE 'What went wrong|FAILURE:|Caused by|Execution failed|BUILD FAILED' build.log | head -60
+          } > desktop/last-build-errors.txt 2>&1 || true
+          head -80 desktop/last-build-errors.txt
+
+      - name: Commit errors
+        if: failure()
+        shell: bash
+        run: |
+          git config user.name "mechanicus-ci"
+          git config user.email "ci@users.noreply.github.com"
+          git add -f desktop/last-build-errors.txt
+          git commit -m "ci: capture build errors [skip ci]" || true
+          git push origin HEAD:windows || true
 
       - name: Show output
+        if: success()
         run: dir desktop\build\compose\binaries\main\msi
 
       - name: Upload MSI artifact
+        if: success()
         uses: actions/upload-artifact@v4
         with:
           name: mechanicus-windows-msi

@@ -1,11 +1,20 @@
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+
 plugins {
-    id("com.android.library")
+    id("com.android.kotlin.multiplatform.library")
     id("org.jetbrains.kotlin.multiplatform")
 }
 
 kotlin {
     jvmToolchain(21)
-    androidTarget()
+    android {
+        namespace = "com.assem.mechanicus.shared"
+        compileSdk = 37
+        minSdk = 26
+        compilerOptions {
+            jvmTarget.set(JvmTarget.JVM_21)
+        }
+    }
     jvm("desktop")
 
     sourceSets {
@@ -15,15 +24,5 @@ kotlin {
         val jvmShared by creating { dependsOn(commonMain) }
         val androidMain by getting { dependsOn(jvmShared) }
         val desktopMain by getting { dependsOn(jvmShared) }
-    }
-}
-
-android {
-    namespace = "com.assem.mechanicus.shared"
-    compileSdk = 37
-    defaultConfig { minSdk = 26 }
-    compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_21
-        targetCompatibility = JavaVersion.VERSION_21
     }
 }

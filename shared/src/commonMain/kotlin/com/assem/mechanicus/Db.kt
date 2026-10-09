@@ -13,7 +13,7 @@ class Db private constructor(private val conn: SQLiteConnection) {
     }
 
     fun exec(sql: String) {
-        conn.execSQL(sql)
+        conn.prepare(sql).use { it.step() }
     }
 
     fun run(sql: String, vararg args: Any?): Int {

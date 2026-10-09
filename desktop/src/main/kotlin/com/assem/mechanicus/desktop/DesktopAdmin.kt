@@ -47,7 +47,8 @@ fun SettingsDesktop(
     go: (Scr) -> Unit,
 ) {
     val banner = LocalBanner.current
-    val manager = store.isManager()
+    val owner = store.isActiveOwner()
+    val ownerName = store.isOwner(store.activeUserName)
     val configured = remember(version) { ServiceAuth.isConfigured() }
     var key by remember { mutableStateOf("") }
     var oldPass by remember { mutableStateOf("") }
@@ -67,8 +68,12 @@ fun SettingsDesktop(
 
         SectionTitle(L.s("مزامنة الشركة", "Company sync"))
         CardBox {
-            if (!manager) {
-                Text(L.s("هذه البطاقة للمدير فقط.", "This card is for the manager only."), color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.5.sp)
+            if (!owner) {
+                Text(
+                    if (ownerName) L.s("بطاقات المسؤول مخفية — اضغط 🐙 أسفل الشاشة 7 مرات لفتحها.", "Admin cards are hidden — tap the 🐙 at the bottom 7 times to reveal them.")
+                    else L.s("هذه البطاقات للمسؤول فقط.", "These cards are for the admin only."),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.5.sp,
+                )
             } else if (!configured) {
                 Text(
                     L.s(
@@ -118,7 +123,7 @@ fun SettingsDesktop(
             }
         }
 
-        if (manager) {
+        if (owner) {
             SectionTitle(L.s("باسورد المسؤول", "Admin password"))
             CardBox {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {

@@ -14,3 +14,5 @@ dependencyResolutionManagement {
 }
 rootProject.name = "MECHANICUS"
 include(":app")
+include(":shared")
+include(":desktop")

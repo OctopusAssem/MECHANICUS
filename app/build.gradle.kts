@@ -11,8 +11,8 @@ android {
         applicationId = "com.assem.mechanicus"
         minSdk = 26
         targetSdk = 37
-        versionCode = 24
-        versionName = "0.14.6"
+        versionCode = 25
+        versionName = "0.14.7"
         vectorDrawables { useSupportLibrary = true }
         val syncBlob = System.getenv("MECHANICUS_SYNC_BLOB") ?: ""
         buildConfigField("String", "SYNC_BLOB", "\"$syncBlob\"")
@@ -61,5 +61,7 @@ dependencies {
     implementation("androidx.compose.ui:ui-graphics")
     implementation("androidx.compose.material3:material3")
     implementation("androidx.compose.material:material-icons-extended")
+    implementation("androidx.biometric:biometric:1.1.0")
+    implementation("androidx.fragment:fragment-ktx:1.9.1")
     implementation("com.google.android.gms:play-services-auth:21.2.0")
 }

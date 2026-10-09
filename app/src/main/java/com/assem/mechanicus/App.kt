@@ -5,9 +5,9 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Build
 import android.widget.Toast
-import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
+import androidx.fragment.app.FragmentActivity
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -29,11 +29,13 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AdminPanelSettings
 import androidx.compose.material.icons.filled.DirectionsCar
+import androidx.compose.material.icons.filled.Fingerprint
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Payments
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
@@ -102,7 +104,7 @@ class AppCtx(
     val version: Int,
 )
 
-class MainActivity : ComponentActivity() {
+class MainActivity : FragmentActivity() {
     private val incoming = mutableStateOf<Uri?>(null)
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -433,6 +435,12 @@ fun SplashScreen(onLaunch: () -> Unit) {
 @Composable
 fun LoginScreen(ctx: AppCtx) {
     val L = ctx.L
+    val context = LocalContext.current
+    val activity = context as? FragmentActivity
+    val bioAvailable = remember { Biometric.available(context) }
+    val syncReady = remember(ctx.version) { ServiceAuth.isConfigured(context) }
+    val bioUser = remember(ctx.version) { if (ctx.store.bioOn) ctx.store.bioUser() else null }
+    var wantBio by remember { mutableStateOf(false) }
     val users = remember(ctx.version) { ctx.store.users() }
     val visible = remember(ctx.version) { ctx.store.visibleUsers() }
     var selected by remember { mutableStateOf("") }
@@ -455,6 +463,30 @@ fun LoginScreen(ctx: AppCtx) {
         Spacer(Modifier.height(18.dp))
 
         CardBox {
+            if (bioUser != null && activity != null && syncReady) {
+                PrimaryButton(L.s("الدخول بالبصمة", "Sign in with fingerprint")) {
+                    Biometric.prompt(
+                        activity,
+                        L.s("دخول MECHANICUS", "MECHANICUS sign-in"),
+                        L.s("إلغاء", "Cancel"),
+                        onSuccess = {
+                            ctx.store.activeUserId = bioUser.id
+                            ctx.store.activeUserName = bioUser.name
+                            ctx.store.adminMode = false
+                            ctx.store.addLog(bioUser.name, "login", "", L.s("تسجيل دخول بالبصمة", "Biometric sign-in"))
+                            ctx.go(Dest.Home)
+                        },
+                        onError = { },
+                    )
+                }
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
+                    TextButton(onClick = { ctx.store.bioOn = false; ctx.store.bioUserId = -1L; ctx.bump() }) {
+                        Text(L.s("إلغاء تفعيل البصمة", "Disable fingerprint"), color = Muted, fontSize = 11.5.sp)
+                    }
+                }
+                Text(L.s("أو", "or"), color = Muted, fontSize = 11.sp, modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center)
+                Spacer(Modifier.height(4.dp))
+            }
             SectionTitle(L.s("تسجيل الدخول", "Sign in"))
                 Field(L.s("اسم المستخدم", "Username"), selected, { selected = it; error = "" })
                 Spacer(Modifier.height(10.dp))
@@ -484,9 +516,23 @@ fun LoginScreen(ctx: AppCtx) {
                             ctx.store.activeUserId = u.id
                             ctx.store.activeUserName = u.name
                             ctx.store.adminMode = false
+                            if (wantBio && bioAvailable && syncReady && bioUser == null) {
+                                ctx.store.bioOn = true
+                                ctx.store.bioUserId = u.id
+                            }
                             ctx.store.addLog(u.name, "login", "", L.s("تسجيل دخول", "Signed in"))
                             ctx.go(Dest.Home)
                         }
+                    }
+                }
+                if (bioAvailable && syncReady && bioUser == null) {
+                    Spacer(Modifier.height(6.dp))
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        Checkbox(checked = wantBio, onCheckedChange = { wantBio = it })
+                        Text(
+                            L.s("تفعيل الدخول بالبصمة للمرة الجاية", "Enable fingerprint sign-in next time"),
+                            fontSize = 12.sp,
+                        )
                     }
                 }
                 if (visible.isNotEmpty()) {

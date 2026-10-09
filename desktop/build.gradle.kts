@@ -23,8 +23,18 @@ compose.desktop {
         nativeDistributions {
             targetFormats(TargetFormat.Msi)
             packageName = "MECHANICUS"
-            packageVersion = "1.0.0"
+            packageVersion = "1.0.1"
             description = "MECHANICUS - YOUR AUTO REPAIR ASSISTANT"
+            windows {
+                // Desktop shortcut + Start Menu entry, and our own app icon
+                // (octopus mechanic) instead of the default Java icon.
+                shortcut = true
+                menu = true
+                dirChooser = true
+                perUserInstall = true
+                upgradeUuid = "8F3B2C41-7A5D-4E90-B6C1-2D4E6F8A0B13"
+                iconFile.set(project.file("icon.ico"))
+            }
         }
     }
 }

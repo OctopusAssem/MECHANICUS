@@ -29,6 +29,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Call
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DirectionsCar
@@ -58,6 +59,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
@@ -80,6 +82,44 @@ fun ScreenBar(title: String, onBack: (() -> Unit)? = null, action: (@Composable 
         }
         Text(title, fontSize = 20.sp, fontWeight = FontWeight.Black, modifier = Modifier.weight(1f).padding(start = if (onBack == null) 2.dp else 4.dp))
         if (action != null) action()
+    }
+}
+
+// Customer phone row with quick WhatsApp + call actions. The two icons only
+// appear when the number looks like a real phone number.
+@Composable
+fun PhoneRow(ctx: AppCtx, phone: String) {
+    val L = ctx.L
+    val context = LocalContext.current
+    Row(
+        Modifier.fillMaxWidth().padding(vertical = 8.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(L.s("التليفون", "Phone"), color = Muted, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+            Text(phone.ifBlank { "—" }, fontSize = 14.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 2.dp))
+        }
+        if (Contact.valid(phone)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                IconButton(onClick = { Contact.whatsapp(context, phone, L.s("واتساب غير مثبّت", "WhatsApp is not installed")) }) {
+                    Icon(
+                        painter = painterResource(R.drawable.ic_whatsapp),
+                        contentDescription = L.s("ارسال رسالة واتساب", "Send WhatsApp message"),
+                        tint = Color.Unspecified,
+                        modifier = Modifier.size(26.dp),
+                    )
+                }
+                IconButton(onClick = { Contact.dial(context, phone, L.s("مش قادر أفتح الاتصال", "Can't open the dialer")) }) {
+                    Icon(
+                        imageVector = Icons.Filled.Call,
+                        contentDescription = L.s("اتصال تليفون", "Phone call"),
+                        tint = Color(0xFF2563EB),
+                        modifier = Modifier.size(24.dp),
+                    )
+                }
+            }
+        }
     }
 }
 
@@ -495,7 +535,7 @@ fun DetailScreen(ctx: AppCtx, id: String) {
         SectionTitle(L.s("بيانات العميل والعربية", "Customer & vehicle"))
         CardBox {
             InfoRow(L.s("اسم العميل", "Customer"), car.customer)
-            InfoRow(L.s("التليفون", "Phone"), car.phone)
+            PhoneRow(ctx, car.phone)
             InfoRow(L.s("رقم الموتور", "Engine"), car.engine)
             InfoRow(L.s("العداد", "Odometer"), car.odometer)
             InfoRow(L.s("تاريخ الدخول", "Entry date"), car.deliveryDate)

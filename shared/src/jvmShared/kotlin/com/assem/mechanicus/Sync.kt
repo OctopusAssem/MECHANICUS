@@ -15,11 +15,13 @@ object SyncEngine {
     data class Counts(var pushed: Int = 0, var pulled: Int = 0, var deleted: Int = 0)
 
     fun run(token: String, store: Store): SyncResult {
-        val preferred = store.driveFolderId.ifBlank { if (ServiceAuth.isConfigured()) ServiceAuth.FOLDER_ID else "" }
-        val folder = GDrive.findOrCreateFolder(token, preferred)
-        if (store.driveFolderId.isBlank()) store.driveFolderId = folder
-        val remoteFiles = GDrive.listFiles(token, folder)
-        val meta = remoteFiles[FILE]
+        // Locate the shared snapshot by NAME. We deliberately do not look the
+        // folder up by id: for a My-Drive folder owned by another account and
+        // only inherited-shared to our service account, Drive returns 404 on
+        // folder-id lookups (and on "in parents" queries), even though the
+        // files inside are readable and writable by their own ids. Name search
+        // plus download/update-by-id is reliable in that situation.
+        val meta = GDrive.findFile(token, FILE)
         val cache = File(store.root(), FILE)
 
         if (meta != null && store.lastSync > 0 && !store.syncPending && meta.second <= store.lastSync + 1000) {
@@ -48,7 +50,7 @@ object SyncEngine {
 
         // One-time recovery: an older MECHANICUS version synced raw .db files.
         if (meta == null && store.lastSync == 0L) {
-            try { seedFromCloudDb(token, folder, store) } catch (_: Exception) {}
+            try { seedFromCloudDb(token, store.driveFolderId.ifBlank { ServiceAuth.FOLDER_ID }, store) } catch (_: Exception) {}
         }
 
         val local = localSnap(store)
@@ -57,6 +59,7 @@ object SyncEngine {
 
         val text = merged.toString()
         cache.writeText(text, Charsets.UTF_8)
+        val folder = store.driveFolderId.ifBlank { ServiceAuth.FOLDER_ID }
         GDrive.uploadFile(token, folder, cache, meta?.first)
 
         store.lastSync = System.currentTimeMillis()

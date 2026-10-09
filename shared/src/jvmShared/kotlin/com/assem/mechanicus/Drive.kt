@@ -99,6 +99,21 @@ object GDrive {
         return out
     }
 
+    // Locate a single file by its exact name. This avoids the folder-id based
+    // queries, which return 404 for a My-Drive folder that lives in another
+    // Google account and is only shared (inherited) to our service account —
+    // name search + download/update by file id work in that case.
+    fun findFile(token: String, name: String): Pair<String, Long>? {
+        val q = URLEncoder.encode("name='$name' and trashed=false", "UTF-8")
+        val c = open("$API?q=$q&fields=files(id,name,modifiedTime)&supportsAllDrives=true&pageSize=50", token, "GET")
+        val body = readAll(c)
+        if (c.responseCode !in 200..299) return null
+        val files = JSONObject(body).optJSONArray("files") ?: return null
+        if (files.length() == 0) return null
+        val o = files.getJSONObject(0)
+        return Pair(o.getString("id"), parseTime(o.optString("modifiedTime")))
+    }
+
     fun uploadFile(token: String, folderId: String, file: File, existingId: String?): String {
         val boundary = "mech" + System.nanoTime()
         val meta = JSONObject()

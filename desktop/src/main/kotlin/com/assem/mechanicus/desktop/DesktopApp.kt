@@ -171,10 +171,7 @@ private fun SideNav(store: Store, L: Lang, dest: Scr, bump: () -> Unit, go: (Scr
     Surface(color = Color(0xFF160A0E), modifier = Modifier.requiredWidth(210.dp).fillMaxHeight()) {
         Column(Modifier.fillMaxSize().padding(14.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(
-                    Modifier.size(38.dp).clip(RoundedCornerShape(12.dp)).background(Red),
-                    contentAlignment = Alignment.Center,
-                ) { Text("🐙", fontSize = 20.sp) }
+                BrandLogo(42.dp)
                 Spacer(Modifier.width(10.dp))
                 Column {
                     Text("MECHANICUS", fontSize = 14.sp, fontWeight = FontWeight.Black, color = Color.White)
@@ -282,10 +279,7 @@ private fun LoginDesktop(store: Store, L: Lang, version: Int, onDone: () -> Unit
             modifier = Modifier.width(430.dp),
         ) {
             Column(Modifier.padding(30.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                Box(
-                    Modifier.size(72.dp).clip(RoundedCornerShape(20.dp)).background(Red),
-                    contentAlignment = Alignment.Center,
-                ) { Text("🐙", fontSize = 38.sp) }
+                BrandLogo(96.dp)
                 Spacer(Modifier.height(14.dp))
                 Text("MECHANICUS", fontSize = 26.sp, fontWeight = FontWeight.Black, letterSpacing = 4.sp, color = Color.White)
                 Text(L.s("مساعد إصلاح السيارات", "YOUR AUTO REPAIR ASSISTANT"), color = Red, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
@@ -368,9 +362,11 @@ private fun LoginDesktop(store: Store, L: Lang, version: Int, onDone: () -> Unit
 fun TopBar(title: String, subtitle: String, actions: @Composable () -> Unit = {}) {
     Surface(color = MaterialTheme.colorScheme.surface, modifier = Modifier.fillMaxWidth()) {
         Row(
-            Modifier.fillMaxWidth().padding(horizontal = 22.dp, vertical = 14.dp),
+            Modifier.fillMaxWidth().padding(horizontal = 22.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
+            BrandLogo(38.dp)
+            Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
                 Text(title, fontSize = 20.sp, fontWeight = FontWeight.Black, color = MaterialTheme.colorScheme.onSurface)
                 if (subtitle.isNotBlank()) Text(subtitle, fontSize = 11.5.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)

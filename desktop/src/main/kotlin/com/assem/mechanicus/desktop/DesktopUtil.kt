@@ -3,6 +3,7 @@ package com.assem.mechanicus.desktop
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
@@ -11,11 +12,25 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.toComposeImageBitmap
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import java.awt.Toolkit
 import java.awt.datatransfer.StringSelection
 import java.io.File
 import javax.imageio.ImageIO
+
+// The original app logo (red octopus + engine), used everywhere in the UI.
+@Composable
+fun BrandLogo(size: Dp, modifier: Modifier = Modifier) {
+    Image(
+        painter = painterResource("icon.png"),
+        contentDescription = "MECHANICUS",
+        contentScale = ContentScale.Fit,
+        modifier = modifier.size(size),
+    )
+}
+
 
 object DesktopActions {
     private fun digits(phone: String): String {

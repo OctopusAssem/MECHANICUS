@@ -123,10 +123,10 @@ object GDrive {
     }
 
     // Locate an update installer published to the shared Drive folder. Matches
-    // any "*.msi" whose name contains "update" (e.g. update.msi,
-    // update-1.0.7.msi) and returns (id, name, modifiedTime).
+    // any "*.msi" (e.g. update.msi, update-1.0.7.msi, MECHANICUS-1.0.7.msi) and
+    // returns (id, name, modifiedTime).
     fun findUpdate(token: String): Triple<String, String, Long>? {
-        val q = URLEncoder.encode("name contains 'update' and name contains '.msi' and trashed=false", "UTF-8")
+        val q = URLEncoder.encode("name contains '.msi' and trashed=false", "UTF-8")
         val c = open("$API?q=$q&fields=files(id,name,modifiedTime)&supportsAllDrives=true&includeItemsFromAllDrives=true&orderBy=modifiedTime desc&pageSize=50", token, "GET")
         val body = readAll(c)
         if (c.responseCode !in 200..299) return null

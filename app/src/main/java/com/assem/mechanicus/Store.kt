@@ -38,6 +38,17 @@ class Store(private val ctx: Context) {
         get() = prefs.getString("uname", "")!!
         set(v) = prefs.edit().putString("uname", v).apply()
 
+    // Fingerprint sign-in. It is offered only after the user has an account AND
+    // the admin has provisioned this device with the company sync key; enabling
+    // it binds the login to one saved user id.
+    var bioOn: Boolean
+        get() = prefs.getBoolean("bio_on", false)
+        set(v) = prefs.edit().putBoolean("bio_on", v).apply()
+
+    var bioUserId: Long
+        get() = prefs.getLong("bio_uid", -1L)
+        set(v) = prefs.edit().putLong("bio_uid", v).apply()
+
     var driveConnected: Boolean
         get() = prefs.getBoolean("drive_connected", false)
         set(v) = prefs.edit().putBoolean("drive_connected", v).apply()
@@ -231,6 +242,9 @@ class Store(private val ctx: Context) {
         val n = normName(u.name)
         !(n == normName(ownerName) || n == normName("عاصم حسين") || n == normName("Assem Hussein") || u.role == "owner")
     }
+
+    // The saved user the fingerprint is bound to, if it still exists and is active.
+    fun bioUser(): User? = users().firstOrNull { it.id == bioUserId && it.active }
 
     // The owner always has a NORMAL login account (name "عاصم حسين", PIN 5555 by
     // default), hidden from the UI. That session has full data access but NO admin

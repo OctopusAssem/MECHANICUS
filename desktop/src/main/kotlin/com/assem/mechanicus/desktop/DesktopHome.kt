@@ -129,6 +129,15 @@ fun HomeDesktop(
                         else -> L.s("متزامن ✅", "Synced ✅")
                     }
                     Text(state, fontSize = 13.sp, fontWeight = FontWeight.Bold, color = if (store.syncPending) Color(0xFFFBBF24) else Green)
+                    if (com.assem.mechanicus.AutoSync.lastError.isNotBlank()) {
+                        Spacer(Modifier.height(6.dp))
+                        Text(
+                            com.assem.mechanicus.AutoSync.lastError,
+                            fontSize = 10.5.sp,
+                            color = Color(0xFFF87171),
+                            maxLines = 3,
+                        )
+                    }
                     Spacer(Modifier.height(12.dp))
                     GhostButton(L.s("مزامنة الآن", "Sync now"), Modifier.fillMaxWidth()) { doSync() }
                 }

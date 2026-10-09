@@ -28,7 +28,15 @@ object GDrive {
     // ---------------- REST ----------------
     private fun open(url: String, token: String, method: String): HttpURLConnection {
         val c = URL(url).openConnection() as HttpURLConnection
-        c.requestMethod = method
+        if (method == "PATCH") {
+            // java.net.HttpURLConnection (unlike Android's) rejects PATCH with
+            // "Invalid HTTP method". Google APIs honor X-HTTP-Method-Override
+            // on a POST, so we tunnel PATCH through POST.
+            c.requestMethod = "POST"
+            c.setRequestProperty("X-HTTP-Method-Override", "PATCH")
+        } else {
+            c.requestMethod = method
+        }
         c.setRequestProperty("Authorization", "Bearer $token")
         c.connectTimeout = 20000
         c.readTimeout = 40000
@@ -188,13 +196,17 @@ object AutoSync {
     const val PENDING = "pending"
     const val LOCKED = "locked"
 
+    @Volatile var lastError: String = ""
+
     fun run(store: Store): String {
         val tok = GDrive.token() ?: return OFFLINE
         return try {
             if (ServiceAuth.isConfigured() && !store.driveConnected) store.driveConnected = true
             val res = SyncEngine.run(tok, store)
+            lastError = ""
             if (res.error == SyncEngine.LOCKED) LOCKED else SYNCED
-        } catch (_: Exception) {
+        } catch (e: Exception) {
+            lastError = e.message ?: e.toString()
             PENDING
         }
     }

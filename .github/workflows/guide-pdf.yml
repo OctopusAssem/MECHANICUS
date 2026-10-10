@@ -1,0 +1,39 @@
+name: guide-pdf
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Rebuild guide PDF from chunks
+        run: |
+          set -e
+          cat .guide/part*.txt | tr -d '\n' | base64 -d > docs/MECHANICUS-User-Guide.pdf
+          ls -l docs/MECHANICUS-User-Guide.pdf
+          head -c 5 docs/MECHANICUS-User-Guide.pdf; echo
+          test "$(head -c 5 docs/MECHANICUS-User-Guide.pdf)" = "%PDF-"
+
+      - name: Commit PDF and remove chunks
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          rm -rf .guide
+          git add -A
+          git commit -m "Add MECHANICUS user guide PDF [skip ci]"
+          git push
+
+      - name: Attach to releases
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          for tag in $(gh release list --limit 10 --json tagName -q '.[].tagName'); do
+            echo "attach to $tag"
+            gh release upload "$tag" docs/MECHANICUS-User-Guide.pdf --clobber
+          done

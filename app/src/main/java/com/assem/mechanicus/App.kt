@@ -36,6 +36,8 @@ import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Payments
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Badge
+import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
@@ -303,11 +305,19 @@ fun BottomBar(ctx: AppCtx, dest: Dest) {
             if (ctx.store.isManager()) add(Triple(Dest.Payments, Icons.Filled.Payments, L.s("المدفوعات", "Payments")))
             add(Triple(Dest.Settings, Icons.Filled.Settings, L.s("الإعدادات", "Settings")))
         }
+        // Managers see a red badge on Settings when staff left new comments.
+        val newComments = if (ctx.store.isManager()) runCatching { ctx.store.unseenComments() }.getOrDefault(0) else 0
         for ((d, icon, label) in items) {
             NavigationBarItem(
                 selected = dest == d,
                 onClick = { ctx.go(d) },
-                icon = { Icon(icon, contentDescription = label) },
+                icon = {
+                    if (d == Dest.Settings && newComments > 0) {
+                        BadgedBox(badge = { Badge { Text("$newComments") } }) { Icon(icon, contentDescription = label) }
+                    } else {
+                        Icon(icon, contentDescription = label)
+                    }
+                },
                 label = { Text(label, fontSize = 10.sp) },
             )
         }

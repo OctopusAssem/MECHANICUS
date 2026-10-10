@@ -75,6 +75,12 @@ class Store(private val ctx: Context) {
         get() = prefs.getLong("comment_seen", 0L)
         set(v) = prefs.edit().putLong("comment_seen", v).apply()
 
+    // Comments at or before this timestamp were cleared by a manager; the
+    // watermark syncs so the deletion reaches Drive and every other device.
+    var commentsClearedTs: Long
+        get() = prefs.getLong("comment_cleared", 0L)
+        set(v) = prefs.edit().putLong("comment_cleared", v).apply()
+
     // The owner is the only one allowed to really delete (on Drive too).
     var ownerName: String
         get() = prefs.getString("owner_name", "عاصم حسين")!!
@@ -303,7 +309,7 @@ class Store(private val ctx: Context) {
 
     fun comments(): List<Comment> {
         val db = openCentral()
-        val c = db.rawQuery("SELECT pid,ts,uname,body FROM comments ORDER BY ts DESC", null)
+        val c = db.rawQuery("SELECT pid,ts,uname,body FROM comments WHERE ts > ? ORDER BY ts DESC", arrayOf(commentsClearedTs.toString()))
         val out = ArrayList<Comment>()
         while (c.moveToNext()) out.add(Comment(c.getString(0) ?: "", c.getLong(1), c.getString(2) ?: "", c.getString(3) ?: ""))
         c.close(); db.close()
@@ -318,6 +324,25 @@ class Store(private val ctx: Context) {
     fun markCommentsSeen() {
         val newest = try { comments().maxOfOrNull { it.ts } ?: 0L } catch (_: Exception) { 0L }
         commentSeenTs = maxOf(commentSeenTs, newest)
+    }
+
+    // Manager action: drop every comment currently visible and record the
+    // watermark so the deletion also reaches Drive and the other devices.
+    fun clearComments(): Boolean {
+        val newest = try { comments().maxOfOrNull { it.ts } ?: 0L } catch (_: Exception) { 0L }
+        if (newest <= 0L) return false
+        val wm = maxOf(commentsClearedTs, newest)
+        commentsClearedTs = wm
+        deleteCommentsUpTo(wm)
+        syncPending = true
+        return true
+    }
+
+    fun deleteCommentsUpTo(ts: Long) {
+        if (ts <= 0L) return
+        val db = openCentral()
+        db.execSQL("DELETE FROM comments WHERE ts <= ?", arrayOf<Any?>(ts))
+        db.close()
     }
 
     fun upsertComment(c: Comment) {

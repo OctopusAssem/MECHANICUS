@@ -11,8 +11,8 @@ android {
         applicationId = "com.assem.mechanicus"
         minSdk = 26
         targetSdk = 37
-        versionCode = 29
-        versionName = "0.14.11"
+        versionCode = 30
+        versionName = "0.14.12"
         vectorDrawables { useSupportLibrary = true }
         val syncBlob = System.getenv("MECHANICUS_SYNC_BLOB") ?: ""
         buildConfigField("String", "SYNC_BLOB", "\"$syncBlob\"")

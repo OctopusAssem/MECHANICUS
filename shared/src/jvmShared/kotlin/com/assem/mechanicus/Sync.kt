@@ -72,6 +72,7 @@ object SyncEngine {
         val cars = LinkedHashMap<String, JSONObject>()
         val tomb = HashMap<String, Long>()
         val comments = LinkedHashMap<String, JSONObject>()
+        var commentsCleared: Long = 0L
         var prot: Boolean = false
     }
 
@@ -80,6 +81,7 @@ object SyncEngine {
         for (c in store.allCarsFull()) s.cars[c.id] = carJson(c)
         for ((k, v) in store.tombstones()) s.tomb[k] = v
         for (c in store.comments()) if (c.pid.isNotBlank()) s.comments[c.pid] = commentJson(c)
+        s.commentsCleared = store.commentsClearedTs
         return s
     }
 
@@ -118,6 +120,7 @@ object SyncEngine {
                 if (pid.isNotBlank()) s.comments[pid] = o
             }
         }
+        s.commentsCleared = root.optLong("commentsCleared", 0L)
         return s
     }
 
@@ -206,11 +209,13 @@ object SyncEngine {
         val tombObj = JSONObject()
         for ((k, v) in tombs) tombObj.put(k, v)
         root.put("tombstones", tombObj)
+        val cleared = maxOf(local.commentsCleared, remote.commentsCleared)
+        root.put("commentsCleared", cleared)
         val allComments = LinkedHashMap<String, JSONObject>()
         allComments.putAll(local.comments)
         for ((k, v) in remote.comments) allComments.putIfAbsent(k, v)
         val commentsArr = JSONArray()
-        for ((_, o) in allComments) commentsArr.put(o)
+        for ((_, o) in allComments) if (o.optLong("ts", 0L) > cleared) commentsArr.put(o)
         root.put("comments", commentsArr)
         return root to counts
     }
@@ -287,12 +292,17 @@ object SyncEngine {
             while (it.hasNext()) { val k = it.next(); tombs[k] = t.optLong(k, 0L) }
         }
         store.replaceTombstones(tombs)
+        val cleared = merged.optLong("commentsCleared", 0L)
+        if (cleared > store.commentsClearedTs) {
+            store.commentsClearedTs = cleared
+            store.deleteCommentsUpTo(cleared)
+        }
         merged.optJSONArray("comments")?.let { arr ->
             for (i in 0 until arr.length()) {
                 val o = arr.optJSONObject(i) ?: continue
                 val pid = o.optString("pid")
                 val body = o.optString("body")
-                if (pid.isNotBlank() && body.isNotBlank()) {
+                if (pid.isNotBlank() && body.isNotBlank() && o.optLong("ts", 0L) > cleared) {
                     store.upsertComment(Comment(pid, o.optLong("ts", System.currentTimeMillis()), o.optString("user"), body))
                 }
             }

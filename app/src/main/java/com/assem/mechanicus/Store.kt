@@ -69,6 +69,12 @@ class Store(private val ctx: Context) {
         get() = prefs.getBoolean("sync_pending", false)
         set(v) = prefs.edit().putBoolean("sync_pending", v).apply()
 
+    // Timestamp of the newest comment a manager has already seen (used for the
+    // "new comments" badge on the Settings tab).
+    var commentSeenTs: Long
+        get() = prefs.getLong("comment_seen", 0L)
+        set(v) = prefs.edit().putLong("comment_seen", v).apply()
+
     // The owner is the only one allowed to really delete (on Drive too).
     var ownerName: String
         get() = prefs.getString("owner_name", "عاصم حسين")!!
@@ -176,6 +182,7 @@ class Store(private val ctx: Context) {
         try { db.execSQL("ALTER TABLE car_index ADD COLUMN adate TEXT") } catch (_: Exception) {}
         db.execSQL("CREATE TABLE IF NOT EXISTS tombstones(id TEXT PRIMARY KEY, updated INTEGER)")
         db.execSQL("CREATE TABLE IF NOT EXISTS hidden(id TEXT PRIMARY KEY)")
+        db.execSQL("CREATE TABLE IF NOT EXISTS comments(id INTEGER PRIMARY KEY AUTOINCREMENT, pid TEXT, ts INTEGER, uname TEXT, body TEXT)")
         return db
     }
 
@@ -276,6 +283,51 @@ class Store(private val ctx: Context) {
         while (c.moveToNext()) out.add(LogEntry(c.getLong(0), c.getLong(1), c.getString(2) ?: "", c.getString(3) ?: "", c.getString(4) ?: "", c.getString(5) ?: ""))
         c.close(); db.close()
         return out
+    }
+
+    // ---------- comments (feedback about the program) ----------
+    // Any user can leave a short note about the program; it is saved with his
+    // name and time, synced to Drive, and read by the managers (admins).
+    fun addComment(userName: String, body: String): Boolean {
+        val b = body.trim()
+        if (b.isEmpty()) return false
+        val db = openCentral()
+        db.execSQL(
+            "INSERT INTO comments(pid,ts,uname,body) VALUES(?,?,?,?)",
+            arrayOf<Any?>(newId(), System.currentTimeMillis(), userName, b.take(200)),
+        )
+        db.close()
+        syncPending = true
+        return true
+    }
+
+    fun comments(): List<Comment> {
+        val db = openCentral()
+        val c = db.rawQuery("SELECT pid,ts,uname,body FROM comments ORDER BY ts DESC", null)
+        val out = ArrayList<Comment>()
+        while (c.moveToNext()) out.add(Comment(c.getString(0) ?: "", c.getLong(1), c.getString(2) ?: "", c.getString(3) ?: ""))
+        c.close(); db.close()
+        return out
+    }
+
+    fun unseenComments(): Int {
+        val seen = commentSeenTs
+        return try { comments().count { it.ts > seen } } catch (_: Exception) { 0 }
+    }
+
+    fun markCommentsSeen() {
+        val newest = try { comments().maxOfOrNull { it.ts } ?: 0L } catch (_: Exception) { 0L }
+        commentSeenTs = maxOf(commentSeenTs, newest)
+    }
+
+    fun upsertComment(c: Comment) {
+        if (c.pid.isBlank() || c.body.isBlank()) return
+        val db = openCentral()
+        db.execSQL(
+            "INSERT OR REPLACE INTO comments(pid,ts,uname,body) VALUES(?,?,?,?)",
+            arrayOf<Any?>(c.pid, c.ts, c.userName, c.body.take(200)),
+        )
+        db.close()
     }
 
     // ---------- cars ----------

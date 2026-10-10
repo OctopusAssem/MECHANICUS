@@ -69,6 +69,13 @@ data class LogEntry(
     val detail: String,
 )
 
+data class Comment(
+    val pid: String,
+    val ts: Long,
+    val userName: String,
+    val body: String,
+)
+
 data class Stats(
     val carsToday: Int,
     val inWork: Int,

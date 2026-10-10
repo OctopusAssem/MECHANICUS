@@ -76,6 +76,7 @@ object SyncEngine {
     class Snap {
         val cars = LinkedHashMap<String, JSONObject>()
         val tomb = HashMap<String, Long>()
+        val comments = LinkedHashMap<String, JSONObject>()
         var prot: Boolean = false
     }
 
@@ -83,7 +84,17 @@ object SyncEngine {
         val s = Snap()
         for (c in store.allCarsFull()) s.cars[c.id] = carJson(c)
         for ((k, v) in store.tombstones()) s.tomb[k] = v
+        for (c in store.comments()) if (c.pid.isNotBlank()) s.comments[c.pid] = commentJson(c)
         return s
+    }
+
+    private fun commentJson(c: Comment): JSONObject {
+        val o = JSONObject()
+        o.put("pid", c.pid)
+        o.put("ts", c.ts)
+        o.put("user", c.userName)
+        o.put("body", c.body)
+        return o
     }
 
     private fun parse(text: String): Snap {
@@ -103,6 +114,13 @@ object SyncEngine {
             while (it.hasNext()) {
                 val k = it.next()
                 s.tomb[k] = t.optLong(k, 0L)
+            }
+        }
+        root.optJSONArray("comments")?.let { arr ->
+            for (i in 0 until arr.length()) {
+                val o = arr.optJSONObject(i) ?: continue
+                val pid = o.optString("pid")
+                if (pid.isNotBlank()) s.comments[pid] = o
             }
         }
         return s
@@ -193,6 +211,12 @@ object SyncEngine {
         val tombObj = JSONObject()
         for ((k, v) in tombs) tombObj.put(k, v)
         root.put("tombstones", tombObj)
+        val allComments = LinkedHashMap<String, JSONObject>()
+        allComments.putAll(local.comments)
+        for ((k, v) in remote.comments) allComments.putIfAbsent(k, v)
+        val commentsArr = JSONArray()
+        for ((_, o) in allComments) commentsArr.put(o)
+        root.put("comments", commentsArr)
         return root to counts
     }
 
@@ -268,6 +292,16 @@ object SyncEngine {
             while (it.hasNext()) { val k = it.next(); tombs[k] = t.optLong(k, 0L) }
         }
         store.replaceTombstones(tombs)
+        merged.optJSONArray("comments")?.let { arr ->
+            for (i in 0 until arr.length()) {
+                val o = arr.optJSONObject(i) ?: continue
+                val pid = o.optString("pid")
+                val body = o.optString("body")
+                if (pid.isNotBlank() && body.isNotBlank()) {
+                    store.upsertComment(Comment(pid, o.optLong("ts", System.currentTimeMillis()), o.optString("user"), body))
+                }
+            }
+        }
     }
 
     private fun seedFromCloudDb(token: String, folder: String, store: Store) {

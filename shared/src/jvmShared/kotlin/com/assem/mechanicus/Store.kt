@@ -73,6 +73,12 @@ class Store {
         get() = prefs.getLong("comment_seen", 0L)
         set(v) = prefs.putLong("comment_seen", v)
 
+    // Comments at or before this timestamp were cleared by a manager; the
+    // watermark syncs so the deletion reaches Drive and every other device.
+    var commentsClearedTs: Long
+        get() = prefs.getLong("comment_cleared", 0L)
+        set(v) = prefs.putLong("comment_cleared", v)
+
     var adminPass: String
         get() = prefs.getString("admin_pass", "5555")
         set(v) = prefs.putString("admin_pass", v.trim())
@@ -255,7 +261,7 @@ class Store {
 
     fun comments(): List<Comment> {
         val db = openCentral()
-        val out = db.query("SELECT pid,ts,uname,body FROM comments ORDER BY ts DESC") { c ->
+        val out = db.query("SELECT pid,ts,uname,body FROM comments WHERE ts > ? ORDER BY ts DESC", commentsClearedTs) { c ->
             Comment(c.textOr(0, ""), c.long(1), c.textOr(2, ""), c.textOr(3, ""))
         }
         db.close()
@@ -276,6 +282,25 @@ class Store {
         if (c.pid.isBlank() || c.body.isBlank()) return
         val db = openCentral()
         db.run("INSERT OR REPLACE INTO comments(pid,ts,uname,body) VALUES(?,?,?,?)", c.pid, c.ts, c.userName, c.body.take(200))
+        db.close()
+    }
+
+    // Manager action: drop every comment currently visible and record the
+    // watermark so the deletion also reaches Drive and the other devices.
+    fun clearComments(): Boolean {
+        val newest = try { comments().maxOfOrNull { it.ts } ?: 0L } catch (_: Exception) { 0L }
+        if (newest <= 0L) return false
+        val wm = maxOf(commentsClearedTs, newest)
+        commentsClearedTs = wm
+        deleteCommentsUpTo(wm)
+        syncPending = true
+        return true
+    }
+
+    fun deleteCommentsUpTo(ts: Long) {
+        if (ts <= 0L) return
+        val db = openCentral()
+        db.run("DELETE FROM comments WHERE ts <= ?", ts)
         db.close()
     }
 

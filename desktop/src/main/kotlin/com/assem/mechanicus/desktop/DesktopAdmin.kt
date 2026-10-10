@@ -60,6 +60,7 @@ fun SettingsDesktop(
     var dbPass by remember { mutableStateOf("") }
     var comment by remember { mutableStateOf("") }
     var confirmUn by remember { mutableStateOf(false) }
+    var clearCommentsDlg by remember { mutableStateOf(false) }
 
     // Managers read the comments, so opening Settings marks them as seen
     // (clears the "new comments" badge).
@@ -241,6 +242,8 @@ fun SettingsDesktop(
                             Text(c.body, fontSize = 12.5.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
+                    Spacer(Modifier.height(10.dp))
+                    GhostButton(L.s("مسح التعليقات القديمة ومزامنة", "Clear old comments & sync")) { clearCommentsDlg = true }
                 }
             }
         }
@@ -291,6 +294,26 @@ fun SettingsDesktop(
                 }) { Text(L.s("إزالة", "Uninstall"), fontWeight = FontWeight.Bold, color = Red) }
             },
             dismissButton = { TextButton(onClick = { confirmUn = false }) { Text(L.s("إلغاء", "Cancel")) } },
+        )
+    }
+
+    if (clearCommentsDlg) {
+        AlertDialog(
+            onDismissRequest = { clearCommentsDlg = false },
+            title = { Text(L.s("مسح التعليقات القديمة", "Clear old comments")) },
+            text = { Text(L.s("هيتم مسح كل التعليقات الحالية، والمزامنة بتشتغل فورًا عشان المسح يوصل لباقي الأجهزة. متأكد؟", "All current comments will be deleted, and sync runs right away so the deletion reaches the other devices. Are you sure?"), fontSize = 14.sp) },
+            confirmButton = {
+                TextButton(onClick = {
+                    clearCommentsDlg = false
+                    val ok = store.clearComments()
+                    bump()
+                    scope.launch {
+                        withContext(Dispatchers.IO) { runCatching { AutoSync.run(store) }.getOrDefault("") }
+                        banner(if (ok) L.s("تم مسح التعليقات وجارٍ المزامنة ✅", "Comments cleared, syncing ✅") else L.s("مفيش تعليقات", "No comments"))
+                    }
+                }) { Text(L.s("امسح وزامن", "Clear & sync"), fontWeight = FontWeight.Bold, color = Red) }
+            },
+            dismissButton = { TextButton(onClick = { clearCommentsDlg = false }) { Text(L.s("إلغاء", "Cancel")) } },
         )
     }
 }

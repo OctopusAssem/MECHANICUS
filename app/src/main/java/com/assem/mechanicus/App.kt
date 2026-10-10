@@ -13,6 +13,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -60,12 +61,15 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
@@ -447,6 +451,30 @@ fun LoginScreen(ctx: AppCtx) {
     var pin by remember { mutableStateOf("") }
     var error by remember { mutableStateOf("") }
     var forgot by remember { mutableStateOf(false) }
+    val pinFocus = remember { FocusRequester() }
+
+    // Enter: on the name box it jumps to the PIN box, on the PIN it signs in.
+    val submit: () -> Unit = {
+        val nm = selected.trim()
+        if (nm.isBlank()) error = L.s("اكتب الاسم", "Enter a name")
+        else if (pin.length != 4) error = L.s("اكتب رقم سري من 4 أرقام", "Enter a 4-digit PIN")
+        else {
+            val u = ctx.store.loginOrCreate(nm, pin)
+            if (u == null) {
+                error = L.s("الاسم ده متسجّل برقم سري تاني", "That name already has a different PIN")
+            } else {
+                ctx.store.activeUserId = u.id
+                ctx.store.activeUserName = u.name
+                ctx.store.adminMode = false
+                if (wantBio && bioAvailable && syncReady && bioUser == null) {
+                    ctx.store.bioOn = true
+                    ctx.store.bioUserId = u.id
+                }
+                ctx.store.addLog(u.name, "login", "", L.s("تسجيل دخول", "Signed in"))
+                ctx.go(Dest.Home)
+            }
+        }
+    }
 
     Column(
         Modifier.fillMaxSize().padding(22.dp),
@@ -488,43 +516,27 @@ fun LoginScreen(ctx: AppCtx) {
                 Spacer(Modifier.height(4.dp))
             }
             SectionTitle(L.s("تسجيل الدخول", "Sign in"))
-                Field(L.s("اسم المستخدم", "Username"), selected, { selected = it; error = "" })
+                Field(
+                    L.s("اسم المستخدم", "Username"), selected, { selected = it; error = "" },
+                    imeAction = ImeAction.Next, onImeAction = { runCatching { pinFocus.requestFocus() } },
+                )
                 Spacer(Modifier.height(10.dp))
                 OutlinedTextField(
                     value = pin,
                     onValueChange = { if (it.length <= 4) pin = it.filter { c -> c.isDigit() }; error = "" },
                     label = { Text(L.s("الرقم السري (4 أرقام)", "PIN (4 digits)")) },
                     singleLine = true,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Done),
+                    keyboardActions = KeyboardActions(onDone = { submit() }),
                     visualTransformation = PasswordVisualTransformation(),
                     shape = RoundedCornerShape(13.dp),
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.fillMaxWidth().focusRequester(pinFocus),
                 )
                 if (error.isNotEmpty()) {
                     Text(error, color = Red, fontSize = 12.sp, modifier = Modifier.padding(top = 6.dp))
                 }
                 Spacer(Modifier.height(12.dp))
-                PrimaryButton(L.s("دخول", "Sign in")) {
-                    val nm = selected.trim()
-                    if (nm.isBlank()) error = L.s("اكتب الاسم", "Enter a name")
-                    else if (pin.length != 4) error = L.s("اكتب رقم سري من 4 أرقام", "Enter a 4-digit PIN")
-                    else {
-                        val u = ctx.store.loginOrCreate(nm, pin)
-                        if (u == null) {
-                            error = L.s("الاسم ده متسجّل برقم سري تاني", "That name already has a different PIN")
-                        } else {
-                            ctx.store.activeUserId = u.id
-                            ctx.store.activeUserName = u.name
-                            ctx.store.adminMode = false
-                            if (wantBio && bioAvailable && syncReady && bioUser == null) {
-                                ctx.store.bioOn = true
-                                ctx.store.bioUserId = u.id
-                            }
-                            ctx.store.addLog(u.name, "login", "", L.s("تسجيل دخول", "Signed in"))
-                            ctx.go(Dest.Home)
-                        }
-                    }
-                }
+                PrimaryButton(L.s("دخول", "Sign in")) { submit() }
                 if (bioAvailable && syncReady && bioUser == null) {
                     Spacer(Modifier.height(6.dp))
                     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {

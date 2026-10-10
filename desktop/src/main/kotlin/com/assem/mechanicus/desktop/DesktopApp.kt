@@ -128,9 +128,9 @@ fun DesktopApp(store: Store) {
         if (banner != null) { delay(2600); banner = null }
     }
 
-    // Tell the owner when staff left new comments (they are the only reader).
+    // Tell managers when staff left new comments (they are the readers).
     LaunchedEffect(version, dest) {
-        if (dest != Scr.Login && store.isActiveOwner() && runCatching { store.unseenComments() }.getOrDefault(0) > 0) {
+        if (dest != Scr.Login && store.isManager() && runCatching { store.unseenComments() }.getOrDefault(0) > 0) {
             banner = L.s("عندك تعليقات جديدة من المستخدمين في الإعدادات", "New user comments — open Settings")
         }
     }
@@ -156,7 +156,7 @@ fun DesktopApp(store: Store) {
                                 // so it collapses to an icon-only rail (keeps the same design).
                                 val narrow = maxWidth < 820.dp
                                 val newComments = remember(version, dest) {
-                                    runCatching { if (store.isActiveOwner()) store.unseenComments() else 0 }.getOrDefault(0)
+                                    runCatching { if (store.isManager()) store.unseenComments() else 0 }.getOrDefault(0)
                                 }
                                 Row(Modifier.fillMaxSize()) {
                                     SideNav(store, L, dest, newComments, narrow, { version++ }) { d -> dest = d }

@@ -86,12 +86,12 @@ jobs:
         run: |
           MSI=$(ls desktop/build/compose/binaries/main/msi/*.msi)
           echo "MSI: $MSI"
-          if ! gh release view desktop-1.0.8 >/dev/null 2>&1; then
-            gh release create desktop-1.0.8 --target windows \
-              --title "MECHANICUS for Windows 1.0.8" \
-              --notes "Windows desktop edition of MECHANICUS (Compose Multiplatform). Offline-first, Arabic/English, silent Google Drive sync via the company key. Install the MSI, sign in with a name + 4-digit PIN, then enter the company key in Settings. This build shows the version in the bottom-right and checks the version of any update installer (in the program folder or published to the shared Drive folder): it only offers to install when the new version is higher than the installed one."
+          if ! gh release view desktop-1.0.9 >/dev/null 2>&1; then
+            gh release create desktop-1.0.9 --target windows \
+              --title "MECHANICUS for Windows 1.0.9" \
+              --notes "Windows desktop edition of MECHANICUS (Compose Multiplatform). Offline-first, Arabic/English, silent Google Drive sync via the company key. Install the MSI, sign in with a name + 4-digit PIN, then enter the company key in Settings. 1.0.9: comments, app updates and uninstall are now available to managers (not only the hidden owner), and the in-app uninstall reliably finds the Windows uninstaller."
           fi
-          gh release upload desktop-1.0.8 "$MSI" --clobber
+          gh release upload desktop-1.0.9 "$MSI" --clobber
 
       - name: Upload MSI artifact
         if: success()

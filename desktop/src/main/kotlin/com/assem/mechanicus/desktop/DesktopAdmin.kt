@@ -51,6 +51,7 @@ fun SettingsDesktop(
 ) {
     val banner = LocalBanner.current
     val owner = store.isActiveOwner()
+    val manager = store.isManager()
     val ownerName = store.isOwner(store.activeUserName)
     val configured = remember(version) { ServiceAuth.isConfigured() }
     var key by remember { mutableStateOf("") }
@@ -60,9 +61,9 @@ fun SettingsDesktop(
     var comment by remember { mutableStateOf("") }
     var confirmUn by remember { mutableStateOf(false) }
 
-    // The owner is the only one who reads the comments, so opening Settings marks
-    // them as seen (clears the "new comments" badge).
-    LaunchedEffect(version, owner) { if (owner) store.markCommentsSeen() }
+    // Managers read the comments, so opening Settings marks them as seen
+    // (clears the "new comments" badge).
+    LaunchedEffect(version, manager) { if (manager) store.markCommentsSeen() }
 
     ContentScroll {
         TopBar(L.s("الإعدادات", "Settings"), L.s("النسخة ${Platform.version}", "Version ${Platform.version}"))
@@ -224,9 +225,9 @@ fun SettingsDesktop(
             }
         }
 
-        if (owner) {
+        if (manager) {
             val all = remember(version) { store.comments() }
-            SectionTitle(L.s("تعليقات المستخدمين (لك فقط)", "User comments (you only)"))
+            SectionTitle(L.s("تعليقات المستخدمين", "User comments"))
             CardBox {
                 if (all.isEmpty()) {
                     Text(L.s("مفيش تعليقات لسه.", "No comments yet."), color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.5.sp)
@@ -244,7 +245,7 @@ fun SettingsDesktop(
             }
         }
 
-        if (owner) {
+        if (manager) {
             SectionTitle(L.s("إزالة البرنامج", "Remove the program"))
             CardBox {
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {

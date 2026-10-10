@@ -33,7 +33,7 @@ object DesktopPlatform {
         Platform.install(
             prefsFactory = { name -> FilePrefs(File(base, "$name.properties")) },
             dataRoot = base.absolutePath,
-            version = "1.0.8",
+            version = "1.0.9",
             notify = { msg -> println("[MECHANICUS] $msg") },
         )
     }

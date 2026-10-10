@@ -397,6 +397,7 @@ fun SettingsScreen(ctx: AppCtx) {
     var commentText by remember { mutableStateOf("") }
     val canManage = ctx.store.isManager()
     var lockMsg by remember { mutableStateOf(false) }
+    var clearCommentsDlg by remember { mutableStateOf(false) }
 
     // Managers are the readers of the comments, so opening Settings clears the
     // "new comments" badge.
@@ -842,6 +843,10 @@ fun SettingsScreen(ctx: AppCtx) {
                             Text(c.body, fontSize = 12.5.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
+                    Spacer(Modifier.height(10.dp))
+                    GhostButton(L.s("مسح التعليقات القديمة ومزامنة", "Clear old comments & sync")) {
+                        clearCommentsDlg = true
+                    }
                 }
             }
         }
@@ -931,6 +936,24 @@ fun SettingsScreen(ctx: AppCtx) {
                 }) { Text(L.s("تأكيد", "Confirm"), fontWeight = FontWeight.Bold, color = Red) }
             },
             dismissButton = { TextButton(onClick = { dbAction = "" }) { Text(L.s("إلغاء", "Cancel")) } },
+        )
+    }
+
+    if (clearCommentsDlg) {
+        AlertDialog(
+            onDismissRequest = { clearCommentsDlg = false },
+            title = { Text(L.s("مسح التعليقات القديمة", "Clear old comments")) },
+            text = { Text(L.s("هيتم مسح كل التعليقات الحالية، والمزامنة بتشتغل فورًا عشان المسح يوصل لباقي الأجهزة. متأكد؟", "All current comments will be deleted, and sync runs right away so the deletion reaches the other devices. Are you sure?"), fontSize = 14.sp) },
+            confirmButton = {
+                TextButton(onClick = {
+                    clearCommentsDlg = false
+                    val ok = ctx.store.clearComments()
+                    ctx.bump()
+                    ctx.requestSync()
+                    Toast.makeText(context, if (ok) L.s("تم مسح التعليقات وجارٍ المزامنة ✅", "Comments cleared, syncing ✅") else L.s("مفيش تعليقات", "No comments"), Toast.LENGTH_SHORT).show()
+                }) { Text(L.s("امسح وزامن", "Clear & sync"), fontWeight = FontWeight.Bold, color = Red) }
+            },
+            dismissButton = { TextButton(onClick = { clearCommentsDlg = false }) { Text(L.s("إلغاء", "Cancel")) } },
         )
     }
 }

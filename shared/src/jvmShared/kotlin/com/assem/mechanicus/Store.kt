@@ -69,6 +69,10 @@ class Store {
         get() = prefs.getBoolean("admin_mode", false)
         set(v) = prefs.putBoolean("admin_mode", v)
 
+    var commentSeenTs: Long
+        get() = prefs.getLong("comment_seen", 0L)
+        set(v) = prefs.putLong("comment_seen", v)
+
     var adminPass: String
         get() = prefs.getString("admin_pass", "5555")
         set(v) = prefs.putString("admin_pass", v.trim())
@@ -142,6 +146,7 @@ class Store {
         val db = Db.open(File(root(), "app.db").absolutePath)
         db.exec("CREATE TABLE IF NOT EXISTS users(id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, pin TEXT, role TEXT, active INTEGER)")
         db.exec("CREATE TABLE IF NOT EXISTS logs(id INTEGER PRIMARY KEY AUTOINCREMENT, ts INTEGER, uname TEXT, action TEXT, plate TEXT, detail TEXT)")
+        db.exec("CREATE TABLE IF NOT EXISTS comments(id INTEGER PRIMARY KEY AUTOINCREMENT, pid TEXT, ts INTEGER, uname TEXT, body TEXT)")
         db.exec("CREATE TABLE IF NOT EXISTS car_index(id TEXT PRIMARY KEY, plate TEXT, customer TEXT, phone TEXT, make TEXT, status TEXT, month TEXT, created INTEGER, updated INTEGER, pay REAL, photo TEXT, adate TEXT)")
         try { db.exec("ALTER TABLE car_index ADD COLUMN adate TEXT") } catch (_: Exception) {}
         db.exec("CREATE TABLE IF NOT EXISTS tombstones(id TEXT PRIMARY KEY, updated INTEGER)")
@@ -235,6 +240,43 @@ class Store {
         }
         db.close()
         return out
+    }
+
+    // ---------- comments (feedback about the program) ----------
+    fun addComment(userName: String, body: String): Boolean {
+        val b = body.trim()
+        if (b.isBlank()) return false
+        val db = openCentral()
+        db.run("INSERT INTO comments(pid,ts,uname,body) VALUES(?,?,?,?)", newId(), System.currentTimeMillis(), userName, b.take(200))
+        db.close()
+        syncPending = true
+        return true
+    }
+
+    fun comments(): List<Comment> {
+        val db = openCentral()
+        val out = db.query("SELECT pid,ts,uname,body FROM comments ORDER BY ts DESC") { c ->
+            Comment(c.textOr(0, ""), c.long(1), c.textOr(2, ""), c.textOr(3, ""))
+        }
+        db.close()
+        return out
+    }
+
+    fun unseenComments(): Int {
+        val seen = commentSeenTs
+        return try { comments().count { it.ts > seen } } catch (_: Exception) { 0 }
+    }
+
+    fun markCommentsSeen() {
+        val newest = try { comments().maxOfOrNull { it.ts } ?: 0L } catch (_: Exception) { 0L }
+        commentSeenTs = maxOf(commentSeenTs, newest)
+    }
+
+    fun upsertComment(c: Comment) {
+        if (c.pid.isBlank() || c.body.isBlank()) return
+        val db = openCentral()
+        db.run("INSERT OR REPLACE INTO comments(pid,ts,uname,body) VALUES(?,?,?,?)", c.pid, c.ts, c.userName, c.body.take(200))
+        db.close()
     }
 
     // ---------- cars ----------

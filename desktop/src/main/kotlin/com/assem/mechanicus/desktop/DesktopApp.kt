@@ -5,6 +5,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -12,6 +13,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.requiredWidth
 import androidx.compose.foundation.layout.size
@@ -19,6 +21,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
@@ -39,10 +42,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
@@ -122,6 +128,13 @@ fun DesktopApp(store: Store) {
         if (banner != null) { delay(2600); banner = null }
     }
 
+    // Tell the owner when staff left new comments (they are the only reader).
+    LaunchedEffect(version, dest) {
+        if (dest != Scr.Login && store.isActiveOwner() && runCatching { store.unseenComments() }.getOrDefault(0) > 0) {
+            banner = L.s("عندك تعليقات جديدة من المستخدمين في الإعدادات", "New user comments — open Settings")
+        }
+    }
+
     CompositionLocalProvider(
         LocalLang provides L,
         LocalBanner provides { banner = it },
@@ -138,19 +151,27 @@ fun DesktopApp(store: Store) {
                         if (dest == Scr.Login) {
                             LoginDesktop(store, L, version) { dest = Scr.Home }
                         } else {
-                            Row(Modifier.fillMaxSize()) {
-                                SideNav(store, L, dest, { version++ }) { d -> dest = d }
-                                Column(Modifier.weight(1f).fillMaxSize()) {
-                                    Surface(color = Color.Transparent, contentColor = MaterialTheme.colorScheme.onBackground) {
-                                        Column(Modifier.fillMaxSize()) {
-                                            Box(Modifier.weight(1f)) {
-                                                ScreenHost(
-                                                    store = store, dest = dest, L = L, version = version,
-                                                    scope = scope, isAr = isAr,
-                                                    go = { dest = it },
-                                                    bump = { version++ },
-                                                    setLang = { lang = it; store.lang = it },
-                                                )
+                            BoxWithConstraints(Modifier.fillMaxSize()) {
+                                // Below ~820dp the 210dp sidebar would squeeze the content,
+                                // so it collapses to an icon-only rail (keeps the same design).
+                                val narrow = maxWidth < 820.dp
+                                val newComments = remember(version, dest) {
+                                    runCatching { if (store.isActiveOwner()) store.unseenComments() else 0 }.getOrDefault(0)
+                                }
+                                Row(Modifier.fillMaxSize()) {
+                                    SideNav(store, L, dest, newComments, narrow, { version++ }) { d -> dest = d }
+                                    Column(Modifier.weight(1f).fillMaxSize()) {
+                                        Surface(color = Color.Transparent, contentColor = MaterialTheme.colorScheme.onBackground) {
+                                            Column(Modifier.fillMaxSize()) {
+                                                Box(Modifier.weight(1f)) {
+                                                    ScreenHost(
+                                                        store = store, dest = dest, L = L, version = version,
+                                                        scope = scope, isAr = isAr,
+                                                        go = { dest = it },
+                                                        bump = { version++ },
+                                                        setLang = { lang = it; store.lang = it },
+                                                    )
+                                                }
                                             }
                                         }
                                     }
@@ -222,48 +243,60 @@ private fun ScreenHost(
 }
 
 @Composable
-private fun SideNav(store: Store, L: Lang, dest: Scr, bump: () -> Unit, go: (Scr) -> Unit) {
-    var confirmOut by remember { mutableStateOf(false) }
-    Surface(color = Color(0xFF160A0E), modifier = Modifier.requiredWidth(210.dp).fillMaxHeight()) {
-        Column(Modifier.fillMaxSize().padding(14.dp)) {
+private fun SideNav(store: Store, L: Lang, dest: Scr, newComments: Int, narrow: Boolean, bump: () -> Unit, go: (Scr) -> Unit) {
+    val doSignOut = {
+        store.activeUserId = 0
+        store.activeUserName = ""
+        store.adminMode = false
+        go(Scr.Login)
+    }
+    Surface(color = Color(0xFF160A0E), modifier = Modifier.requiredWidth(if (narrow) 78.dp else 210.dp).fillMaxHeight()) {
+        Column(
+            Modifier.fillMaxSize().padding(if (narrow) 8.dp else 14.dp),
+            horizontalAlignment = if (narrow) Alignment.CenterHorizontally else Alignment.Start,
+        ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                BrandLogo(42.dp)
-                Spacer(Modifier.width(10.dp))
-                Column {
-                    Text("MECHANICUS", fontSize = 14.sp, fontWeight = FontWeight.Black, color = Color.White)
-                    Text(L.s("مساعد الإصلاح", "Auto repair"), fontSize = 10.sp, color = MutedDark)
+                BrandLogo(if (narrow) 38.dp else 42.dp)
+                if (!narrow) {
+                    Spacer(Modifier.width(10.dp))
+                    Column {
+                        Text("MECHANICUS", fontSize = 14.sp, fontWeight = FontWeight.Black, color = Color.White)
+                        Text(L.s("مساعد الإصلاح", "Auto repair"), fontSize = 10.sp, color = MutedDark)
+                    }
                 }
             }
             Spacer(Modifier.height(20.dp))
-            NavItem("🏠", L.s("الرئيسية", "Home"), dest == Scr.Home) { go(Scr.Home) }
-            NavItem("🚗", L.s("العربيات", "Cars"), dest == Scr.Cars) { go(Scr.Cars) }
-            if (store.isManager()) NavItem("💰", L.s("المدفوعات", "Payments"), dest == Scr.Payments) { go(Scr.Payments) }
-            NavItem("👥", L.s("المستخدمون", "Users"), dest == Scr.Users) { go(Scr.Users) }
-            NavItem("📜", L.s("السجل", "Change log"), dest == Scr.Logs) { go(Scr.Logs) }
-            NavItem("⚙️", L.s("الإعدادات", "Settings"), dest == Scr.Settings) { go(Scr.Settings) }
+            NavItem("🏠", L.s("الرئيسية", "Home"), dest == Scr.Home, 0, narrow) { go(Scr.Home) }
+            NavItem("🚗", L.s("العربيات", "Cars"), dest == Scr.Cars, 0, narrow) { go(Scr.Cars) }
+            if (store.isManager()) NavItem("💰", L.s("المدفوعات", "Payments"), dest == Scr.Payments, 0, narrow) { go(Scr.Payments) }
+            NavItem("👥", L.s("المستخدمون", "Users"), dest == Scr.Users, 0, narrow) { go(Scr.Users) }
+            NavItem("📜", L.s("السجل", "Change log"), dest == Scr.Logs, 0, narrow) { go(Scr.Logs) }
+            NavItem("⚙️", L.s("الإعدادات", "Settings"), dest == Scr.Settings, newComments, narrow) { go(Scr.Settings) }
             Spacer(Modifier.weight(1f))
-            Surface(
-                color = Color(0xFF23101522),
-                shape = RoundedCornerShape(12.dp),
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Column(Modifier.padding(10.dp)) {
-                    Text(stripWhitespace(store.activeUserName), fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.White)
-                    Text(
-                        if (store.isManager()) L.s("مدير", "Manager") else L.s("فني", "Technician"),
-                        fontSize = 10.5.sp, color = Red,
-                    )
+            if (!narrow) {
+                Surface(
+                    color = Color(0xFF23101522),
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Column(Modifier.padding(10.dp)) {
+                        Text(stripWhitespace(store.activeUserName), fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                        Text(
+                            if (store.isManager()) L.s("مدير", "Manager") else L.s("فني", "Technician"),
+                            fontSize = 10.5.sp, color = Red,
+                        )
+                    }
                 }
-            }
-            Spacer(Modifier.height(8.dp))
-            GhostButton(L.s("خروج", "Sign out"), Modifier.fillMaxWidth()) {
-                store.activeUserId = 0
-                store.activeUserName = ""
-                store.adminMode = false
-                go(Scr.Login)
+                Spacer(Modifier.height(8.dp))
+                GhostButton(L.s("خروج", "Sign out"), Modifier.fillMaxWidth()) { doSignOut() }
+            } else {
+                Box(
+                    Modifier.size(44.dp).clip(RoundedCornerShape(12.dp)).clickable { doSignOut() },
+                    contentAlignment = Alignment.Center,
+                ) { Text("🚪", fontSize = 18.sp) }
             }
             Spacer(Modifier.height(6.dp))
-            Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.CenterEnd) {
+            Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
                 OwnerUnlockOctopus(store, L, bump)
             }
         }
@@ -303,17 +336,33 @@ private fun OwnerUnlockOctopus(store: Store, L: Lang, bump: () -> Unit) {
 private fun stripWhitespace(s: String) = s.trim()
 
 @Composable
-private fun NavItem(emoji: String, label: String, selected: Boolean, onClick: () -> Unit) {
+private fun NavItem(emoji: String, label: String, selected: Boolean, badge: Int, narrow: Boolean, onClick: () -> Unit) {
     Surface(
         color = if (selected) Red.copy(alpha = 0.22f) else Color.Transparent,
         shape = RoundedCornerShape(11.dp),
         border = if (selected) BorderStroke(1.dp, Red.copy(alpha = 0.5f)) else null,
         modifier = Modifier.fillMaxWidth().padding(vertical = 3.dp).clickable { onClick() },
     ) {
-        Row(Modifier.padding(horizontal = 11.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
-            Text(emoji, fontSize = 15.sp)
-            Spacer(Modifier.width(11.dp))
-            Text(label, fontSize = 13.sp, fontWeight = if (selected) FontWeight.Bold else FontWeight.SemiBold, color = if (selected) Color.White else MutedDark)
+        Row(
+            Modifier.fillMaxWidth().padding(horizontal = if (narrow) 0.dp else 11.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = if (narrow) Arrangement.Center else Arrangement.Start,
+        ) {
+            Box {
+                Text(emoji, fontSize = 15.sp)
+                if (badge > 0) {
+                    Box(
+                        Modifier.align(Alignment.TopEnd).offset(x = 9.dp, y = (-7).dp)
+                            .background(Red, RoundedCornerShape(50)).padding(horizontal = 4.dp, vertical = 1.dp),
+                    ) {
+                        Text(if (badge > 9) "9+" else "$badge", color = Color.White, fontSize = 8.sp, fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
+            if (!narrow) {
+                Spacer(Modifier.width(11.dp))
+                Text(label, fontSize = 13.sp, fontWeight = if (selected) FontWeight.Bold else FontWeight.SemiBold, color = if (selected) Color.White else MutedDark)
+            }
         }
     }
 }
@@ -325,6 +374,25 @@ private fun LoginDesktop(store: Store, L: Lang, version: Int, onDone: () -> Unit
     var err by remember { mutableStateOf("") }
     val configured = remember(version) { ServiceAuth.isConfigured() }
     val users = remember(version) { store.visibleUsers() }
+    val pinFocus = remember { FocusRequester() }
+
+    // Pressing Enter: on the username it jumps to the PIN box, on the PIN it signs in.
+    val submit: () -> Unit = {
+        val nm = name.trim()
+        if (nm.isBlank()) err = L.s("اكتب الاسم", "Enter a name")
+        else if (pin.length != 4) err = L.s("اكتب رقم سري من 4 أرقام", "Enter a 4-digit PIN")
+        else {
+            val u = store.loginOrCreate(nm, pin)
+            if (u == null) err = L.s("الاسم ده متسجّل برقم سري تاني", "That name already has a different PIN")
+            else {
+                store.activeUserId = u.id
+                store.activeUserName = u.name
+                store.adminMode = false
+                store.addLog(u.name, "login", "", L.s("تسجيل دخول", "Signed in"))
+                onDone()
+            }
+        }
+    }
 
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         Surface(
@@ -352,38 +420,27 @@ private fun LoginDesktop(store: Store, L: Lang, version: Int, onDone: () -> Unit
                     Spacer(Modifier.height(12.dp))
                 }
 
-                Field(L.s("اسم المستخدم", "Username"), name, { name = it; err = "" })
+                Field(
+                    L.s("اسم المستخدم", "Username"), name, { name = it; err = "" },
+                    imeAction = ImeAction.Next, onImeAction = { runCatching { pinFocus.requestFocus() } },
+                )
                 Spacer(Modifier.height(10.dp))
                 OutlinedTextField(
                     value = pin,
                     onValueChange = { if (it.length <= 4) pin = it.filter { c -> c.isDigit() }; err = "" },
                     label = { Text(L.s("الرقم السري (4 أرقام)", "PIN (4 digits)"), fontSize = 12.sp) },
                     singleLine = true,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Done),
+                    keyboardActions = KeyboardActions(onDone = { submit() }),
                     visualTransformation = PasswordVisualTransformation(),
                     shape = RoundedCornerShape(13.dp),
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.fillMaxWidth().focusRequester(pinFocus),
                 )
                 if (err.isNotEmpty()) {
                     Text(err, color = Red, fontSize = 12.sp, modifier = Modifier.fillMaxWidth().padding(top = 7.dp))
                 }
                 Spacer(Modifier.height(16.dp))
-                PrimaryButton(L.s("دخول", "Sign in")) {
-                    val nm = name.trim()
-                    if (nm.isBlank()) err = L.s("اكتب الاسم", "Enter a name")
-                    else if (pin.length != 4) err = L.s("اكتب رقم سري من 4 أرقام", "Enter a 4-digit PIN")
-                    else {
-                        val u = store.loginOrCreate(nm, pin)
-                        if (u == null) err = L.s("الاسم ده متسجّل برقم سري تاني", "That name already has a different PIN")
-                        else {
-                            store.activeUserId = u.id
-                            store.activeUserName = u.name
-                            store.adminMode = false
-                            store.addLog(u.name, "login", "", L.s("تسجيل دخول", "Signed in"))
-                            onDone()
-                        }
-                    }
-                }
+                PrimaryButton(L.s("دخول", "Sign in")) { submit() }
                 if (users.isNotEmpty()) {
                     Spacer(Modifier.height(14.dp))
                     Text(L.s("مستخدمون محفوظون", "Saved users"), color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 11.sp)

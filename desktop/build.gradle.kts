@@ -23,7 +23,7 @@ compose.desktop {
         nativeDistributions {
             targetFormats(TargetFormat.Msi)
             packageName = "MECHANICUS"
-            packageVersion = "1.0.7"
+            packageVersion = "1.0.8"
             description = "MECHANICUS - YOUR AUTO REPAIR ASSISTANT"
             windows {
                 // Desktop shortcut + Start Menu entry, and our own app icon

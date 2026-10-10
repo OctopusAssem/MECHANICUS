@@ -12,10 +12,13 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -54,6 +57,12 @@ fun SettingsDesktop(
     var oldPass by remember { mutableStateOf("") }
     var newPass by remember { mutableStateOf("") }
     var dbPass by remember { mutableStateOf("") }
+    var comment by remember { mutableStateOf("") }
+    var confirmUn by remember { mutableStateOf(false) }
+
+    // The owner is the only one who reads the comments, so opening Settings marks
+    // them as seen (clears the "new comments" badge).
+    LaunchedEffect(version, owner) { if (owner) store.markCommentsSeen() }
 
     ContentScroll {
         TopBar(L.s("الإعدادات", "Settings"), L.s("النسخة ${Platform.version}", "Version ${Platform.version}"))
@@ -187,5 +196,103 @@ fun SettingsDesktop(
             Spacer(Modifier.height(8.dp))
             Text(L.s("نسخة الويندوز — تعمل بدون إنترنت وتتزامن مع درايف لما النت يرجع.", "Windows edition — works offline and syncs to Drive when back online."), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
+
+        // Last section on the last screen: a short comment box about the program.
+        SectionTitle(L.s("تعليق على البرنامج", "Comment about the program"))
+        CardBox {
+            Text(
+                L.s(
+                    "اكتب ملاحظتك أو اقتراحك عن البرنامج (200 حرف كحد أقصى). بتتحفظ باسمك والوقت وبتتزامن مع باقي الأجهزة.",
+                    "Write your feedback or suggestion about the program (200 characters max). Saved with your name and time, and synced with the other devices.",
+                ),
+                fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(Modifier.height(10.dp))
+            Field(
+                L.s("تعليقك", "Your comment"), comment, { comment = it.take(200) },
+                singleLine = false, minLines = 3, maxLen = 200,
+            )
+            Spacer(Modifier.height(6.dp))
+            Text("${comment.length}/200", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.fillMaxWidth())
+            Spacer(Modifier.height(8.dp))
+            PrimaryButton(L.s("إرسال", "Send")) {
+                if (store.addComment(store.activeUserName.ifBlank { "—" }, comment)) {
+                    comment = ""
+                    bump()
+                    banner(L.s("تم إرسال تعليقك، شكرًا لك ✅", "Thanks! Your comment was sent ✅"))
+                } else banner(L.s("اكتب تعليقك الأول", "Write your comment first"))
+            }
+        }
+
+        if (owner) {
+            val all = remember(version) { store.comments() }
+            SectionTitle(L.s("تعليقات المستخدمين (لك فقط)", "User comments (you only)"))
+            CardBox {
+                if (all.isEmpty()) {
+                    Text(L.s("مفيش تعليقات لسه.", "No comments yet."), color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.5.sp)
+                } else {
+                    for (c in all) {
+                        Column(Modifier.fillMaxWidth().padding(vertical = 6.dp)) {
+                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                Text(c.userName.ifBlank { "—" }, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                                Text(fmtTs(c.ts), color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 11.sp)
+                            }
+                            Text(c.body, fontSize = 12.5.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+                }
+            }
+        }
+
+        if (owner) {
+            SectionTitle(L.s("إزالة البرنامج", "Remove the program"))
+            CardBox {
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    BlackOctopus(56.dp)
+                    Spacer(Modifier.width(14.dp))
+                    Text(
+                        L.s(
+                            "ده هيشيل البرنامج من الجهاز زي إزالة أي برنامج من ويندوز. بياناتك على درايف مش بتتأثر.",
+                            "This removes the program from this PC like any Windows uninstall. Your Drive data is not affected.",
+                        ),
+                        fontSize = 12.5.sp, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Spacer(Modifier.height(10.dp))
+                GhostButton(L.s("إزالة البرنامج", "Uninstall MECHANICUS"), Modifier.fillMaxWidth()) { confirmUn = true }
+            }
+        }
+    }
+
+    if (confirmUn) {
+        AlertDialog(
+            onDismissRequest = { confirmUn = false },
+            icon = { BlackOctopus(64.dp) },
+            title = { Text(L.s("تأكيد إزالة البرنامج", "Confirm uninstall")) },
+            text = {
+                Text(
+                    L.s(
+                        "هل تريد إزالة MECHANICUS من الجهاز؟ البرنامج هيتقفل وتبدأ عملية الإزالة.",
+                        "Remove MECHANICUS from this PC? The app will close and the uninstall will start.",
+                    ),
+                    fontSize = 13.sp,
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    confirmUn = false
+                    if (DesktopUninstall.launchUninstall()) {
+                        banner(L.s("بدأت الإزالة، البرنامج هيتقفل.", "Uninstall started, the app will close."))
+                        scope.launch { kotlinx.coroutines.delay(1200); kotlin.system.exitProcess(0) }
+                    } else {
+                        banner(L.s("مش لاقي برنامج الإزالة — استخدم إعدادات ويندوز > التطبيقات.", "Couldn't find the uninstaller — use Windows Settings > Apps."))
+                    }
+                }) { Text(L.s("إزالة", "Uninstall"), fontWeight = FontWeight.Bold, color = Red) }
+            },
+            dismissButton = { TextButton(onClick = { confirmUn = false }) { Text(L.s("إلغاء", "Cancel")) } },
+        )
     }
 }
+
+private fun fmtTs(ts: Long): String =
+    java.text.SimpleDateFormat("yyyy-MM-dd HH:mm", java.util.Locale.US).format(java.util.Date(ts))

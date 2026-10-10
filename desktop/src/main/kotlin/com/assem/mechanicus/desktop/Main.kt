@@ -1,5 +1,6 @@
 package com.assem.mechanicus.desktop
 
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
@@ -20,8 +21,11 @@ fun main() {
             onCloseRequest = ::exitApplication,
             title = "MECHANICUS",
             icon = painterResource("icon.png"),
-            state = rememberWindowState(size = DpSize(1260.dp, 860.dp)),
+            state = rememberWindowState(size = DpSize(1120.dp, 800.dp)),
         ) {
+            // The window can be shrunk down to a phone-sized width; below ~820dp the
+            // sidebar collapses to an icon rail so the content always fits.
+            LaunchedEffect(Unit) { window.minimumSize = java.awt.Dimension(460, 720) }
             DesktopApp(store)
         }
     }

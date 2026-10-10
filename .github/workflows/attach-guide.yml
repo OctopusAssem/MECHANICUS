@@ -15,6 +15,6 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          TAG=$(gh release view --json tagName -q .tagName)
+          TAG=$(gh release list --limit 30 --json tagName -q '[.[] | select(.tagName | startswith("build-"))][0].tagName')
           echo "Attaching to release: $TAG"
           gh release upload "$TAG" docs/MECHANICUS-User-Guide.pdf --clobber

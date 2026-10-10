@@ -53,6 +53,7 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -393,8 +394,13 @@ fun SettingsScreen(ctx: AppCtx) {
     var dbErr by remember { mutableStateOf("") }
     var dbOn by remember { mutableStateOf(ctx.store.dbProtected) }
     var syncKey by remember { mutableStateOf("") }
+    var commentText by remember { mutableStateOf("") }
     val canManage = ctx.store.isManager()
     var lockMsg by remember { mutableStateOf(false) }
+
+    // Managers are the readers of the comments, so opening Settings clears the
+    // "new comments" badge.
+    LaunchedEffect(ctx.version, canManage) { if (canManage) ctx.store.markCommentsSeen() }
 
     val importLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) {
@@ -792,6 +798,52 @@ fun SettingsScreen(ctx: AppCtx) {
         if (!canManage) {
             Box(Modifier.matchParentSize().pointerInput(Unit) { detectTapGestures { lockMsg = true } })
         }
+        }
+
+        // Available to EVERYONE: a short note about the program. It is saved
+        // with the sender's name and time, synced to Drive, and read by managers.
+        SectionTitle(L.s("تعليق على البرنامج", "Comment about the program"))
+        CardBox {
+            Text(
+                L.s("اكتب ملاحظتك أو اقتراحك عن البرنامج (200 حرف كحد أقصى). بتتحفظ باسمك والوقت وبتتزامن مع باقي الأجهزة، والمدير هو اللي بيقراها.", "Write your feedback or suggestion about the program (200 characters max). Saved with your name and time, synced with the other devices, and read by the manager."),
+                color = Muted, fontSize = 11.5.sp,
+            )
+            Spacer(Modifier.height(8.dp))
+            Field(L.s("تعليقك", "Your comment"), commentText, { commentText = it.take(200) }, singleLine = false, minLines = 3, maxLen = 200)
+            Spacer(Modifier.height(6.dp))
+            Text("${commentText.length}/200", color = Muted, fontSize = 11.sp)
+            Spacer(Modifier.height(8.dp))
+            PrimaryButton(L.s("إرسال", "Send")) {
+                if (ctx.store.addComment(ctx.store.activeUserName.ifBlank { "—" }, commentText)) {
+                    commentText = ""
+                    ctx.bump()
+                    ctx.requestSync()
+                    Toast.makeText(context, L.s("تم إرسال تعليقك، شكرًا لك ✅", "Thanks! Your comment was sent ✅"), Toast.LENGTH_SHORT).show()
+                } else {
+                    Toast.makeText(context, L.s("اكتب تعليقك الأول", "Write your comment first"), Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
+
+        if (canManage) {
+            val allComments = remember(ctx.version) { ctx.store.comments() }
+            SectionTitle(L.s("تعليقات المستخدمين", "User comments") + if (allComments.isEmpty()) "" else " (${allComments.size})")
+            CardBox {
+                if (allComments.isEmpty()) {
+                    Text(L.s("مفيش تعليقات لسه.", "No comments yet."), color = Muted, fontSize = 12.5.sp)
+                } else {
+                    val fmt = remember { SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.US) }
+                    for (c in allComments) {
+                        Column(Modifier.fillMaxWidth().padding(vertical = 6.dp)) {
+                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                Text(c.userName.ifBlank { "—" }, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                                Text(fmt.format(Date(c.ts)), color = Muted, fontSize = 11.sp)
+                            }
+                            Text(c.body, fontSize = 12.5.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+                }
+            }
         }
 
         SectionTitle(L.s("الجلسة", "Session"))

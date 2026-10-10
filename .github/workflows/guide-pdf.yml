@@ -15,7 +15,7 @@ jobs:
       - name: Rebuild guide PDF from chunks
         run: |
           set -e
-          cat .guide/part*.txt | tr -d '\n' | base64 -d > docs/MECHANICUS-User-Guide.pdf
+          cat .guide/part* | tr -d '\n' | base64 -d > docs/MECHANICUS-User-Guide.pdf
           ls -l docs/MECHANICUS-User-Guide.pdf
           head -c 5 docs/MECHANICUS-User-Guide.pdf; echo
           test "$(head -c 5 docs/MECHANICUS-User-Guide.pdf)" = "%PDF-"

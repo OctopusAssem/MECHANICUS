@@ -171,7 +171,7 @@ object Report {
     fun today(store: Store, isAr: Boolean): String {
         val sb = StringBuilder()
         val day = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date())
-        sb.append(if (isAr) "MECHANICUS — تقرير جلسة يوم " else "MECHANICUS — session report ")
+        sb.append(if (isAr) "engautoagency — تقرير جلسة يوم " else "engautoagency — session report ")
         sb.append(day).append("\n")
         sb.append("========================\n\n")
 
@@ -221,10 +221,9 @@ object AutoSync {
     const val LOCKED = "locked"
 
     fun run(context: Context, store: Store): String {
-        val tok = GDrive.token(context) ?: return OFFLINE
         return try {
-            if (ServiceAuth.isConfigured(context) && !store.driveConnected) store.driveConnected = true
-            val res = SyncEngine.run(context, tok, store)
+            store.driveConnected = true
+            val res = SyncEngine.run(context, "cloud", store)
             if (res.error == SyncEngine.LOCKED) LOCKED else SYNCED
         } catch (e: Exception) {
             PENDING

@@ -231,7 +231,7 @@ fun HomeScreen(ctx: AppCtx) {
             Spacer(Modifier.height(11.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(11.dp)) {
                 if (mgr) QuickAction("📜", L.s("السجل", "Log"), Modifier.weight(1f)) { ctx.go(Dest.Logs) }
-                QuickAction("☁️", L.s("صلاحيات درايف", "Drive"), Modifier.weight(1f)) { ctx.go(Dest.Sync) }
+                QuickAction("☁️", L.s("المزامنة", "Sync"), Modifier.weight(1f)) { ctx.go(Dest.Sync) }
                 if (mgr) QuickAction("📤", L.s("تصدير جلسة اليوم", "Export today"), Modifier.weight(1f)) {
                     Transfer.exportToday(context, ctx.store, L, ctx.store.activeUserName)
                 }
@@ -615,7 +615,7 @@ fun DetailScreen(ctx: AppCtx, id: String) {
             title = { Text(L.s("حذف نهائي", "Delete permanently")) },
             text = {
                 Text(
-                    L.s("هتحذف العربية نهائيًا من درايف ومن كل الأجهزة. متأكد؟", "This deletes the car permanently from Drive and all devices. Are you sure?"),
+                    L.s("هتحذف العربية نهائيًا من السيرفر ومن كل الأجهزة. متأكد؟", "This deletes the car permanently from the server and all devices. Are you sure?"),
                     fontSize = 14.sp,
                 )
             },

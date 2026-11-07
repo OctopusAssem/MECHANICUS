@@ -383,6 +383,7 @@ fun EditCarScreen(ctx: AppCtx, id: String?) {
     var delivery by remember { mutableStateOf(existing?.deliveryDate ?: todayString()) }
     var customer by remember { mutableStateOf(existing?.customer ?: "") }
     var phone by remember { mutableStateOf(existing?.phone ?: "") }
+    var email by remember { mutableStateOf(existing?.email ?: "") }
     var worker by remember { mutableStateOf(existing?.worker ?: ctx.store.activeUserName) }
     var intake by remember { mutableStateOf(existing?.intake ?: "") }
     var parts by remember { mutableStateOf(existing?.parts?.joinToString("، ") ?: "") }
@@ -467,6 +468,8 @@ fun EditCarScreen(ctx: AppCtx, id: String?) {
             Spacer(Modifier.height(12.dp))
             Field(L.s("تليفون العميل", "Phone"), phone, { phone = it }, keyboardType = KeyboardType.Phone, digitsOnly = true)
             Spacer(Modifier.height(10.dp))
+            Field(L.s("إيميل العميل (اختياري — لمتابعة عربيته على الموقع)", "Customer email (optional — for the client page)"), email, { email = it }, keyboardType = KeyboardType.Email)
+            Spacer(Modifier.height(10.dp))
             Field(L.s("اسم العميل", "Customer name"), customer, { customer = it })
             Spacer(Modifier.height(10.dp))
             Field(L.s("العامل المسؤول", "Worker"), worker, { worker = it })
@@ -501,7 +504,7 @@ fun EditCarScreen(ctx: AppCtx, id: String?) {
             val carId = existing?.id ?: ctx.store.newId()
             val car = Car(
                 id = carId, plate = plate, engine = engine, odometer = odometer, make = make, model = model,
-                deliveryDate = delivery, customer = customer, phone = phone, worker = worker, intake = intake,
+                deliveryDate = delivery, customer = customer, phone = phone, email = email.trim(), worker = worker, intake = intake,
                 status = existing?.status ?: Status.WORK, monthKey = existing?.monthKey ?: "",
                 createdAt = existing?.createdAt ?: 0L, updatedAt = 0L, photo = photo,
                 parts = parts.split(",", "،").map { it.trim() }.filter { it.isNotEmpty() },
@@ -563,6 +566,7 @@ fun DetailScreen(ctx: AppCtx, id: String) {
         CardBox {
             InfoRow(L.s("اسم العميل", "Customer"), car.customer)
             PhoneRow(ctx, car.phone)
+            if (car.email.isNotBlank()) InfoRow(L.s("إيميل العميل", "Customer email"), car.email)
             InfoRow(L.s("رقم الموتور", "Engine"), car.engine)
             InfoRow(L.s("العداد", "Odometer"), car.odometer)
             InfoRow(L.s("تاريخ الدخول", "Entry date"), car.deliveryDate)

@@ -36,6 +36,7 @@ object Transfer {
         o.put("deliveryDate", c.deliveryDate)
         o.put("customer", c.customer)
         o.put("phone", c.phone)
+        o.put("email", c.email)
         o.put("worker", c.worker)
         o.put("intake", c.intake)
         o.put("status", c.status)
@@ -130,6 +131,7 @@ object Transfer {
                 deliveryDate = o.optString("deliveryDate"),
                 customer = o.optString("customer"),
                 phone = o.optString("phone"),
+                email = o.optString("email"),
                 worker = o.optString("worker"),
                 intake = o.optString("intake"),
                 status = o.optString("status").ifBlank { Status.WORK },

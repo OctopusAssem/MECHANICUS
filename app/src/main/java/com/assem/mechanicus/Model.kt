@@ -28,7 +28,6 @@ data class Car(
     val deliveryDate: String,
     val customer: String,
     val phone: String,
-    val email: String = "",
     val worker: String,
     val intake: String,
     val status: String,
@@ -38,6 +37,7 @@ data class Car(
     val photo: String? = null,
     val parts: List<String> = emptyList(),
     val payments: List<Payment> = emptyList(),
+    val email: String = "",
 )
 
 data class IndexRow(

@@ -28,6 +28,7 @@ data class Car(
     val deliveryDate: String,
     val customer: String,
     val phone: String,
+    val email: String = "",
     val worker: String,
     val intake: String,
     val status: String,

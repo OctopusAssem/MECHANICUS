@@ -40,10 +40,36 @@ object SyncEngine {
 
         File(store.root(), FILE).writeText(merged.toString(), Charsets.UTF_8)
         Cloud.push(merged)
+        try { uploadCustomerPhotos(store) } catch (_: Exception) {}
 
         store.lastSync = System.currentTimeMillis()
         store.syncPending = false
         return SyncResult(counts.pushed, counts.pulled + counts.deleted, "")
+    }
+
+    // ---------------- customer photos ----------------
+    private fun photoId(email: String, carId: String, name: String, size: Long): String {
+        val md = java.security.MessageDigest.getInstance("SHA-1")
+        val d = md.digest(("$email|$carId|$name|$size").toByteArray(Charsets.UTF_8))
+        return d.joinToString("") { String.format("%02x", it) }.take(24)
+    }
+
+    // Pushes each car's plate photo into the customer's storage on the site so
+    // he can see it on the client page with his email. Deterministic ids plus a
+    // local "uploaded" list make this idempotent and cheap.
+    private fun uploadCustomerPhotos(store: Store) {
+        for (car in store.allCarsFull()) {
+            val email = car.email.trim().lowercase()
+            if (!email.contains('@')) continue
+            val p = car.photo ?: continue
+            if (p.startsWith("content://")) continue
+            val f = if (p.contains("/")) File(p) else File(store.photosDir(), p)
+            if (!f.exists() || f.length() == 0L) continue
+            val id = photoId(email, car.id, f.name, f.length())
+            if (store.photoUploaded(id)) continue
+            Cloud.uploadPhoto(email, car.id, f.name, f.readBytes(), f.lastModified())
+            store.markPhotoUploaded(id)
+        }
     }
 
     // ---------------- snapshots ----------------
@@ -114,6 +140,7 @@ object SyncEngine {
         o.put("delivery", c.deliveryDate)
         o.put("customer", c.customer)
         o.put("phone", c.phone)
+        o.put("email", c.email)
         o.put("worker", c.worker)
         o.put("intake", c.intake)
         o.put("status", c.status)
@@ -353,6 +380,7 @@ object SyncEngine {
             deliveryDate = o.optString("delivery"),
             customer = o.optString("customer"),
             phone = o.optString("phone"),
+            email = o.optString("email"),
             worker = o.optString("worker"),
             intake = o.optString("intake"),
             status = o.optString("status").ifBlank { Status.WORK },

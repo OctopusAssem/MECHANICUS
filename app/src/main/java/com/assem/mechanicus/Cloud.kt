@@ -43,4 +43,21 @@ object Cloud {
         c.outputStream.use { it.write(snapshot.toString().toByteArray(Charsets.UTF_8)) }
         return JSONObject(body(c)).optJSONObject("snapshot") ?: JSONObject()
     }
+
+    // Uploads a car photo into the customer's own storage folder on the site
+    // (served back to him by email on the client page).
+    fun uploadPhoto(email: String, carId: String, name: String, bytes: ByteArray, ts: Long) {
+        val b = JSONObject()
+        b.put("email", email)
+        b.put("carId", carId)
+        b.put("name", name)
+        b.put("ts", ts)
+        b.put("data", android.util.Base64.encodeToString(bytes, android.util.Base64.NO_WRAP))
+        val c = open("upload_photo")
+        c.requestMethod = "POST"
+        c.doOutput = true
+        c.setRequestProperty("Content-Type", "application/json; charset=UTF-8")
+        c.outputStream.use { it.write(b.toString().toByteArray(Charsets.UTF_8)) }
+        body(c)
+    }
 }

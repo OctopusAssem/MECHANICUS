@@ -194,7 +194,8 @@ class Store(private val ctx: Context) {
 
     private fun openMonth(key: String): SQLiteDatabase {
         val db = SQLiteDatabase.openOrCreateDatabase(File(dataDir(), "$key.db"), null)
-        db.execSQL("CREATE TABLE IF NOT EXISTS cars(id TEXT PRIMARY KEY, plate TEXT, engine TEXT, odometer TEXT, make TEXT, model TEXT, delivery TEXT, customer TEXT, phone TEXT, worker TEXT, intake TEXT, status TEXT, created INTEGER, updated INTEGER, photo TEXT)")
+        db.execSQL("CREATE TABLE IF NOT EXISTS cars(id TEXT PRIMARY KEY, plate TEXT, engine TEXT, odometer TEXT, make TEXT, model TEXT, delivery TEXT, customer TEXT, phone TEXT, email TEXT, worker TEXT, intake TEXT, status TEXT, created INTEGER, updated INTEGER, photo TEXT)")
+        try { db.execSQL("ALTER TABLE cars ADD COLUMN email TEXT") } catch (_: Exception) {}
         db.execSQL("CREATE TABLE IF NOT EXISTS parts(id INTEGER PRIMARY KEY AUTOINCREMENT, carId TEXT, name TEXT)")
         db.execSQL("CREATE TABLE IF NOT EXISTS payments(id INTEGER PRIMARY KEY AUTOINCREMENT, carId TEXT, amount REAL, stage TEXT, uid INTEGER, uname TEXT, ts INTEGER)")
         try { db.execSQL("ALTER TABLE payments ADD COLUMN pid TEXT") } catch (_: Exception) {}
@@ -424,7 +425,7 @@ class Store(private val ctx: Context) {
         c.close(); cdb.close()
 
         val mdb = openMonth(month)
-        val cc = mdb.rawQuery("SELECT plate,engine,odometer,make,model,delivery,customer,phone,worker,intake,status,photo FROM cars WHERE id=?", arrayOf(id))
+        val cc = mdb.rawQuery("SELECT plate,engine,odometer,make,model,delivery,customer,phone,email,worker,intake,status,photo FROM cars WHERE id=?", arrayOf(id))
         if (!cc.moveToFirst()) { cc.close(); mdb.close(); return null }
         val car = Car(
             id = id,
@@ -436,13 +437,14 @@ class Store(private val ctx: Context) {
             deliveryDate = cc.getString(5) ?: "",
             customer = cc.getString(6) ?: "",
             phone = cc.getString(7) ?: "",
-            worker = cc.getString(8) ?: "",
-            intake = cc.getString(9) ?: "",
-            status = cc.getString(10) ?: status,
+            email = cc.getString(8) ?: "",
+            worker = cc.getString(9) ?: "",
+            intake = cc.getString(10) ?: "",
+            status = cc.getString(11) ?: status,
             monthKey = month,
             createdAt = created,
             updatedAt = updated,
-            photo = cc.getString(11) ?: idxPhoto,
+            photo = cc.getString(12) ?: idxPhoto,
         )
         cc.close()
 
@@ -549,6 +551,14 @@ class Store(private val ctx: Context) {
         return list
     }
 
+    // ids of car photos already pushed to the customer storage on the site
+    fun photoUploaded(id: String): Boolean = prefs.getStringSet("ph_up", null)?.contains(id) ?: false
+    fun markPhotoUploaded(id: String) {
+        val s = prefs.getStringSet("ph_up", null) ?: HashSet()
+        val copy = HashSet(s); copy.add(id)
+        prefs.edit().putStringSet("ph_up", copy).apply()
+    }
+
     // ---------- sync helpers ----------
     fun allCarsFull(): List<Car> = carIndexIds().mapNotNull { carDetail(it) }
 
@@ -637,8 +647,8 @@ class Store(private val ctx: Context) {
         val updated = if (car.updatedAt > 0) car.updatedAt else System.currentTimeMillis()
         val mdb = openMonth(mk)
         mdb.execSQL(
-            "INSERT OR REPLACE INTO cars(id,plate,engine,odometer,make,model,delivery,customer,phone,worker,intake,status,created,updated,photo) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
-            arrayOf<Any?>(car.id, car.plate, car.engine, car.odometer, car.make, car.model, car.deliveryDate, car.customer, car.phone, car.worker, car.intake, car.status, created, updated, car.photo)
+            "INSERT OR REPLACE INTO cars(id,plate,engine,odometer,make,model,delivery,customer,phone,email,worker,intake,status,created,updated,photo) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            arrayOf<Any?>(car.id, car.plate, car.engine, car.odometer, car.make, car.model, car.deliveryDate, car.customer, car.phone, car.email, car.worker, car.intake, car.status, created, updated, car.photo)
         )
         mdb.execSQL("DELETE FROM parts WHERE carId=?", arrayOf(car.id))
         for (p in car.parts) if (p.isNotBlank()) mdb.execSQL("INSERT INTO parts(carId,name) VALUES(?,?)", arrayOf(car.id, p.trim()))

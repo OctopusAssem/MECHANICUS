@@ -12,7 +12,5 @@ dependencyResolutionManagement {
         mavenCentral()
     }
 }
-rootProject.name = "MECHANICUS"
-include(":app")
-include(":shared")
-include(":desktop")
+rootProject.name = "CS_engauto"
+include(":customer")

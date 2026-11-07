@@ -177,12 +177,12 @@ fun App(incoming: MutableState<Uri?>? = null) {
         incoming?.value = null
     }
 
-    // Flush any pending (made-offline) changes to Drive on launch. When the app
+    // Flush any pending (made-offline) changes to the server on launch. When the app
     // carries the shop's service account, sync is on for everyone from the start
     // (no per-phone Google sign-in) and we also pull in that first sync.
     LaunchedEffect(Unit) {
-        if (ServiceAuth.isConfigured(context) && !store.driveConnected) store.driveConnected = true
-        if (store.driveConnected && (store.syncPending || ServiceAuth.isConfigured(context))) {
+        store.driveConnected = true
+        run {
             val r = withContext(Dispatchers.IO) { AutoSync.run(context, store) }
             if (r == AutoSync.SYNCED) version++
             if (r == AutoSync.SYNCED || r == AutoSync.LOCKED) locked = store.dbProtected && !store.dbAuthorized
@@ -264,8 +264,8 @@ fun App(incoming: MutableState<Uri?>? = null) {
                     text = {
                         Text(
                             when {
-                                pending && store.driveConnected -> L.s("فيه تغييرات لسه متزامنتش مع درايف. تحب تزامن قبل الخروج؟", "There are changes not synced to Drive yet. Sync before exiting?")
-                                pending -> L.s("فيه تغييرات متزامنتش (مفيش اتصال بدرايف). تخرج عادي؟", "There are unsynced changes (Drive not connected). Exit anyway?")
+                                pending && store.driveConnected -> L.s("فيه تغييرات لسه متزامنتش مع السيرفر. تحب تزامن قبل الخروج؟", "There are changes not synced to the server yet. Sync before exiting?")
+                                pending -> L.s("فيه تغييرات متزامنتش (مفيش اتصال بالسيرفر). تخرج عادي؟", "There are unsynced changes (no server connection). Exit anyway?")
                                 else -> L.s("كل حاجة متزامنة. تحب تقفل البرنامج؟", "Everything is synced. Close the app?")
                             },
                             fontSize = 14.sp,
@@ -411,10 +411,10 @@ fun SplashScreen(onLaunch: () -> Unit) {
         ) {
             Image(
                 painter = painterResource(R.mipmap.ic_launcher_foreground),
-                contentDescription = "MECHANICUS",
+                contentDescription = "engautoagency",
                 modifier = Modifier.size(180.dp),
             )
-            Text("MECHANICUS", color = Color.White, fontSize = 30.sp, fontWeight = FontWeight.Black, letterSpacing = 5.sp)
+            Text("engautoagency", color = Color.White, fontSize = 30.sp, fontWeight = FontWeight.Black, letterSpacing = 0.5.sp)
             Spacer(Modifier.height(8.dp))
             Text(
                 L.s("مساعد إصلاح السيارات", "YOUR AUTO REPAIR ASSISTANT"),
@@ -493,10 +493,10 @@ fun LoginScreen(ctx: AppCtx) {
         Spacer(Modifier.height(18.dp))
         Image(
             painter = painterResource(R.mipmap.ic_launcher_foreground),
-            contentDescription = "MECHANICUS",
+            contentDescription = "engautoagency",
             modifier = Modifier.size(120.dp),
         )
-        Text("MECHANICUS", fontSize = 26.sp, fontWeight = FontWeight.Black, letterSpacing = 3.sp)
+        Text("engautoagency", fontSize = 26.sp, fontWeight = FontWeight.Black, letterSpacing = 0.5.sp)
         Text(L.s("مساعد إصلاح السيارات", "YOUR AUTO REPAIR ASSISTANT"), color = Red, fontSize = 11.sp, fontWeight = FontWeight.Bold)
         Spacer(Modifier.height(18.dp))
 
@@ -505,7 +505,7 @@ fun LoginScreen(ctx: AppCtx) {
                 PrimaryButton(L.s("الدخول بالبصمة", "Sign in with fingerprint")) {
                     Biometric.prompt(
                         activity,
-                        L.s("دخول MECHANICUS", "MECHANICUS sign-in"),
+                        L.s("دخول engautoagency", "engautoagency sign-in"),
                         L.s("إلغاء", "Cancel"),
                         onSuccess = {
                             ctx.store.activeUserId = bioUser.id

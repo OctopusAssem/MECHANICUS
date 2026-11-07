@@ -7,7 +7,7 @@ import org.json.JSONObject
 import java.io.File
 
 // Real, mergeable sync. The cloud keeps ONE JSON snapshot (sync.json) inside the
-// "MECHANICUS" Drive folder. Every sync downloads it, merges it with local data
+// shop database. Every sync downloads it, merges it with local data
 // record-by-record (cars by id, payments by pid, deletions by tombstone) and
 // uploads the union. This survives a reinstall and lets several phones that use
 // the same Google account see the same data.
@@ -18,28 +18,10 @@ object SyncEngine {
     data class Counts(var pushed: Int = 0, var pulled: Int = 0, var deleted: Int = 0)
 
     fun run(ctx: Context, token: String, store: Store): SyncResult {
-        val preferred = store.driveFolderId.ifBlank { if (ServiceAuth.isConfigured(ctx)) ServiceAuth.FOLDER_ID else "" }
-        val folder = GDrive.findOrCreateFolder(token, preferred)
-        // Learn the folder id on first sync so the owner can copy it to other
-        // phones (so phones with different Google accounts sync to the same place).
-        if (store.driveFolderId.isBlank()) store.driveFolderId = folder
-        val remoteFiles = GDrive.listFiles(token, folder)
-        val meta = remoteFiles[FILE]
-        val cache = File(store.root(), FILE)
-
-        // Fast path: nothing local to push and the cloud copy has not moved.
-        if (meta != null && store.lastSync > 0 && !store.syncPending && meta.second <= store.lastSync + 1000) {
-            return SyncResult(0, 0, "")
-        }
-
-        val remote = if (meta != null) {
-            try {
-                GDrive.downloadFile(token, meta.first, cache)
-                parse(cache.readText(Charsets.UTF_8))
-            } catch (_: Exception) {
-                Snap()
-            }
-        } else Snap()
+        // Cloud = the shop's own MySQL snapshot behind the cPanel API on
+        // engautoagency.com. Pull, merge record-by-record, push the union.
+        val obj = Cloud.pull()
+        val remote = if (obj.length() > 0) parse(obj.toString()) else Snap()
 
         // The database owner can protect the shared database. Once protected, a
         // device that has not been authorized with the admin password must not
@@ -52,20 +34,12 @@ object SyncEngine {
             store.dbProtected = true
         }
 
-        // One-time recovery: an older MECHANICUS version synced raw .db files.
-        // If there is no sync.json yet and we have never synced, pull any data
-        // out of those files so a reinstall does not lose it.
-        if (meta == null && store.lastSync == 0L) {
-            try { seedFromCloudDb(token, folder, store) } catch (_: Exception) {}
-        }
-
         val local = localSnap(store)
         val (merged, counts) = merge(store, local, remote)
         applyMerged(store, merged, local)
 
-        val text = merged.toString()
-        cache.writeText(text, Charsets.UTF_8)
-        GDrive.uploadFile(token, folder, cache, meta?.first)
+        File(store.root(), FILE).writeText(merged.toString(), Charsets.UTF_8)
+        Cloud.push(merged)
 
         store.lastSync = System.currentTimeMillis()
         store.syncPending = false
@@ -102,7 +76,7 @@ object SyncEngine {
     private fun parse(text: String): Snap {
         val s = Snap()
         val root = JSONObject(text)
-        if (root.optString("app") != "MECHANICUS") return s
+        if (root.optString("app") !in listOf("ENGAUTO", "MECHANICUS")) return s
         s.prot = root.optBoolean("protected", false)
         root.optJSONArray("cars")?.let { arr ->
             for (i in 0 until arr.length()) {
@@ -206,7 +180,7 @@ object SyncEngine {
         }
 
         val root = JSONObject()
-        root.put("app", "MECHANICUS")
+        root.put("app", "ENGAUTO")
         root.put("format", 2)
         root.put("protected", store.dbProtected)
         root.put("updatedAt", System.currentTimeMillis())

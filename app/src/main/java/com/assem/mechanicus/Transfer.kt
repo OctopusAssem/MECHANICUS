@@ -53,7 +53,7 @@ object Transfer {
 
     private fun build(cars: List<Car>, type: String, userName: String): String {
         val root = JSONObject()
-        root.put("app", "MECHANICUS")
+        root.put("app", "ENGAUTO")
         root.put("format", 1)
         root.put("type", type)
         root.put("exportedAt", System.currentTimeMillis())
@@ -66,7 +66,7 @@ object Transfer {
 
     private fun write(context: Context, text: String, type: String): File {
         val stamp = SimpleDateFormat("yyyy-MM-dd_HHmm", Locale.US).format(Date())
-        val f = File(context.cacheDir, "MECHANICUS-$type-$stamp.$EXT")
+        val f = File(context.cacheDir, "engautoagency-$type-$stamp.$EXT")
         f.writeText(text, Charsets.UTF_8)
         return f
     }
@@ -85,7 +85,7 @@ object Transfer {
     }
 
     fun shareCars(context: Context, cars: List<Car>, type: String, L: Lang, userName: String) {
-        val subject = L.s("جلسة MECHANICUS", "MECHANICUS session")
+        val subject = L.s("جلسة engautoagency", "engautoagency session")
         val f = write(context, build(cars, type, userName), type)
         share(context, f, subject)
     }
@@ -113,7 +113,7 @@ object Transfer {
 
     fun importJson(store: Store, text: String, userName: String): Int {
         val root = JSONObject(text)
-        if (root.optString("app") != "MECHANICUS") throw IllegalArgumentException("not_mechanicus")
+        if (root.optString("app") !in listOf("ENGAUTO", "MECHANICUS")) throw IllegalArgumentException("not_engauto")
         val arr = root.optJSONArray("cars") ?: throw IllegalArgumentException("no_cars")
         var n = 0
         for (i in 0 until arr.length()) {

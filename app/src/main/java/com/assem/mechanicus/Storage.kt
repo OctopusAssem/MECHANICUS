@@ -32,7 +32,7 @@ object Gallery {
     private fun values(name: String): ContentValues = ContentValues().apply {
         put(MediaStore.Images.Media.DISPLAY_NAME, name)
         put(MediaStore.Images.Media.MIME_TYPE, "image/jpeg")
-        if (Build.VERSION.SDK_INT >= 29) put(MediaStore.Images.Media.RELATIVE_PATH, Environment.DIRECTORY_PICTURES + "/MECHANICUS")
+        if (Build.VERSION.SDK_INT >= 29) put(MediaStore.Images.Media.RELATIVE_PATH, Environment.DIRECTORY_PICTURES + "/engautoagency")
     }
 
     fun saveFile(ctx: Context, src: File, name: String): String? = try {
@@ -54,7 +54,7 @@ object Gallery {
 // plus a small red "MECHANICUS" tag stamped at the bottom, kept in the app
 // folder (so a backup carries it) and copied to the phone Gallery.
 object PhotoStore {
-    const val PREFIX = "MECHANICUS_plate_"
+    const val PREFIX = "engautoagency_plate_"
 
     fun build(ctx: Context, store: Store, src: File, name: String): File? = try {
         val raw = BitmapFactory.decodeFile(src.absolutePath) ?: return null
@@ -91,7 +91,7 @@ object PhotoStore {
         stripPaint.color = android.graphics.Color.argb(130, 8, 4, 5)
         c.drawRect(0f, h - strip, w, h, stripPaint)
 
-        val text = "MECHANICUS"
+        val text = "engautoagency"
         val tp = Paint(Paint.ANTI_ALIAS_FLAG)
         tp.color = android.graphics.Color.WHITE
         tp.typeface = Typeface.DEFAULT_BOLD
@@ -114,7 +114,7 @@ object PhotoStore {
 object Backup {
     fun export(ctx: Context, store: Store, subject: String) {
         val stamp = SimpleDateFormat("yyyy-MM-dd_HHmm", Locale.US).format(Date())
-        val zip = File(ctx.cacheDir, "MECHANICUS-backup-$stamp.zip")
+        val zip = File(ctx.cacheDir, "engautoagency-backup-$stamp.zip")
         ZipOutputStream(zip.outputStream()).use { zos ->
             for (f in store.dbFiles()) {
                 val rel = if (f.parentFile?.name == "data") "data/${f.name}" else f.name
@@ -174,7 +174,7 @@ object Backup {
 object AppShare {
     private fun apk(ctx: Context): File {
         val src = File(ctx.applicationInfo.sourceDir)
-        val out = File(ctx.cacheDir, "MECHANICUS-${appVersion(ctx)}.apk")
+        val out = File(ctx.cacheDir, "engautoagency-${appVersion(ctx)}.apk")
         if (!out.exists() || out.length() != src.length()) src.copyTo(out, overwrite = true)
         return out
     }
@@ -183,7 +183,7 @@ object AppShare {
 
     fun shareZip(ctx: Context, subject: String) {
         val a = apk(ctx)
-        val zip = File(ctx.cacheDir, "MECHANICUS-${appVersion(ctx)}.zip")
+        val zip = File(ctx.cacheDir, "engautoagency-${appVersion(ctx)}.zip")
         ZipOutputStream(zip.outputStream()).use { zos ->
             zos.putNextEntry(ZipEntry(a.name))
             a.inputStream().use { it.copyTo(zos) }

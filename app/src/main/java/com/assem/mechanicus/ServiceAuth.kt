@@ -42,9 +42,12 @@ object ServiceAuth {
         return try { JSONObject(j).also { cachedJson = j } } catch (_: Exception) { null }
     }
 
-    fun isConfigured(ctx: Context): Boolean = sa(ctx) != null
+    // The sync API key ships inside the app, so every device can sync.
+    fun isConfigured(ctx: Context): Boolean = true
 
-    fun email(ctx: Context): String = sa(ctx)?.optString("client_email").orEmpty()
+    fun email(ctx: Context): String = "engautoagency.com"
+
+    fun storedEmail(ctx: Context): String = sa(ctx)?.optString("client_email").orEmpty()
 
     // Decrypt the embedded credential with the admin's Company Key. Returns true
     // on success and caches the credential for this device.

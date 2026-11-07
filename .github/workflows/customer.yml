@@ -1,0 +1,54 @@
+name: customer
+
+on:
+  push:
+    branches: [ customer ]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '9.7.1'
+      - name: Restore signing keystore
+        env:
+          MECHANICUS_KEYSTORE_B64: ${{ secrets.MECHANICUS_KEYSTORE_B64 }}
+        run: |
+          mkdir -p customer/keystore
+          echo "$MECHANICUS_KEYSTORE_B64" | base64 -d > customer/keystore/mechanicus.p12
+      - name: Build
+        run: |
+          set +e
+          gradle :customer:assembleRelease --no-daemon --stacktrace > build.log 2>&1
+          rc=$?
+          { grep -E "^e: |error: |FAILURE: |What went wrong" -A3 build.log | head -60; echo '---- tail ----'; tail -30 build.log; } > customer-errors.txt || true
+          exit $rc
+      - name: Commit build errors
+        if: failure()
+        run: |
+          git config user.email "334589465+OctopusAssem@users.noreply.github.com"
+          git config user.name "AssemHussein"
+          git add customer-errors.txt
+          git commit -m "[skip ci] customer build errors" || exit 0
+          git push
+      - name: Rename
+        run: cp customer/build/outputs/apk/release/*.apk CS_engauto.apk
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: cs-${{ github.run_number }}
+          name: CS_engauto ${{ github.run_number }}
+          body: Customer app (CS_engauto.apk)
+          files: CS_engauto.apk
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

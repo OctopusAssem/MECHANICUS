@@ -33,7 +33,21 @@ jobs:
       - name: Build release APK
         env:
           MECHANICUS_SYNC_BLOB: ${{ secrets.MECHANICUS_SYNC_BLOB }}
-        run: gradle :app:assembleRelease --no-daemon --stacktrace
+        run: |
+          set +e
+          gradle :app:assembleRelease --no-daemon --stacktrace > build.log 2>&1
+          rc=$?
+          { grep -E "^e: |error: |FAILURE: " build.log | head -60; echo '---- tail ----'; tail -30 build.log; } > last-errors.txt || true
+          exit $rc
+
+      - name: Commit build errors
+        if: failure()
+        run: |
+          git config user.email "334589465+OctopusAssem@users.noreply.github.com"
+          git config user.name "AssemHussein"
+          git add last-errors.txt
+          git commit -m "[skip ci] build errors" || exit 0
+          git push
 
       - name: Show APK info
         run: |
